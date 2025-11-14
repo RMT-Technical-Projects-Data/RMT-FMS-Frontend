@@ -598,6 +598,7 @@ import type { User, Folder } from "../types";
 interface FileManagementProps {
   selectedFolderId: number | null;
   selectedFolderName?: string | null; // NEW prop - optional folder name passed from Dashboard
+  selectedFolderPathSegments?: string[]; // NEW prop - breadcrumb segments passed from Dashboard
   searchQuery: string;
   user: User;
   isUploadModalOpen: boolean;
@@ -619,6 +620,7 @@ interface FileManagementProps {
 const FileManagement: React.FC<FileManagementProps> = ({
   selectedFolderId,
   selectedFolderName,
+  selectedFolderPathSegments,
   searchQuery,
   user,
   isUploadModalOpen,
@@ -877,11 +879,28 @@ const FileManagement: React.FC<FileManagementProps> = ({
             <div>
               <h2 className="text-xl font-bold text-gray-900">
                 {selectedFolderId
-                  ? selectedFolderName
-                    ? `Folder: ${selectedFolderName}`
-                    : `Folder Contents`
+                  ? "Folder Contents"
                   : "Dashboard - All Files & Folders"}
               </h2>
+              {selectedFolderId && (
+                <div className="mt-1 text-sm text-gray-700 font-semibold flex items-center flex-wrap gap-1">
+                  {selectedFolderPathSegments && selectedFolderPathSegments.length > 0 ? (
+                    selectedFolderPathSegments.map((segment, index) => (
+                      <React.Fragment key={`${segment}-${index}`}>
+                        {index > 0 && <span className="text-gray-400">/</span>}
+                        <span
+                          className="truncate max-w-[140px] md:max-w-none"
+                          title={segment}
+                        >
+                          {segment}
+                        </span>
+                      </React.Fragment>
+                    ))
+                  ) : selectedFolderName ? (
+                    <span title={selectedFolderName}>{selectedFolderName}</span>
+                  ) : null}
+                </div>
+              )}
               <p className="text-gray-500 mt-1">
                 {totalItems} items • {totalSize.toLocaleString()} bytes
                 {selectedFolderId && (

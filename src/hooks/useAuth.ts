@@ -4,7 +4,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import type { User } from "../types";
 
-const API_BASE_URL = "https://rmtfms.duckdns.org/api";
+ const API_BASE_URL = "https://rmtfms.duckdns.org/api";
 // const API_BASE_URL = "http://localhost:3000/api";
 
 // Login types and hook

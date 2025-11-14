@@ -424,14 +424,14 @@
 // };
 
 // export default Dashboard;
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FiHome,
   FiUsers,
   FiLogOut,
   FiMenu,
-  FiX,
+
   // FiStar,
   FiTrash2,
 } from "react-icons/fi";
@@ -608,6 +608,24 @@ const Dashboard: React.FC = () => {
     navigate("/login");
   };
 
+  const selectedFolderPathSegments = useMemo(() => {
+    if (!selectedFolderId) {
+      return [];
+    }
+
+    const historyNames = navigationNameHistory.filter(
+      (name): name is string => !!name && name.trim().length > 0
+    );
+
+    const segments = ["All Files", ...historyNames];
+
+    if (selectedFolderName && selectedFolderName.trim().length > 0) {
+      segments.push(selectedFolderName);
+    }
+
+    return segments;
+  }, [navigationNameHistory, selectedFolderId, selectedFolderName]);
+
   const navigationItems = [
     {
       id: "dashboard",
@@ -681,17 +699,18 @@ const Dashboard: React.FC = () => {
               />
             </div>
             <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="hidden lg:flex p-2 hover:bg-gray-100 rounded-xl transition-colors"
-            >
-              <FiX size={18} className="text-gray-500" />
-            </button>
-            <button
-              onClick={() => setMobileSidebarOpen(false)}
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
-            >
-              <FiX size={18} className="text-gray-500" />
-            </button>
+  onClick={() => setSidebarOpen(!sidebarOpen)}
+  className="hidden lg:flex p-2 hover:bg-gray-100 rounded-xl transition-colors"
+>
+  <FiMenu size={18} className="text-gray-500" />
+</button>
+
+<button
+  onClick={() => setMobileSidebarOpen(false)}
+  className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
+>
+  <FiMenu size={18} className="text-gray-500" />
+</button>
           </div>
 
           {/* Navigation */}
@@ -858,6 +877,7 @@ const Dashboard: React.FC = () => {
                 <FileManagement
                   selectedFolderId={selectedFolderId}
                   selectedFolderName={selectedFolderName}
+                  selectedFolderPathSegments={selectedFolderPathSegments}
                   searchQuery=""
                   user={user}
                   isUploadModalOpen={isUploadModalOpen}
