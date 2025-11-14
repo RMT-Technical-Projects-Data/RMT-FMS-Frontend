@@ -1,4 +1,3 @@
-// // components/FileManagement.tsx
 // import React from "react";
 // import {
 //   FiUpload,
@@ -31,6 +30,8 @@
 
 // interface FileManagementProps {
 //   selectedFolderId: number | null;
+//   selectedFolderName?: string | null; // NEW prop - optional folder name passed from Dashboard
+//   selectedFolderPathSegments?: string[]; // NEW prop - breadcrumb segments passed from Dashboard
 //   searchQuery: string;
 //   user: User;
 //   isUploadModalOpen: boolean;
@@ -41,7 +42,7 @@
 //   setPermissionResource: (
 //     resource: { id: number; type: "folder" | "file" } | null
 //   ) => void;
-//   onFolderSelect: (folderId: number | null) => void;
+//   onFolderSelect: (folderId: number | null, folderName?: string | null) => void; // accepts optional name
 //   onBackNavigation?: () => void;
 //   showToast?: (
 //     message: string,
@@ -51,6 +52,8 @@
 
 // const FileManagement: React.FC<FileManagementProps> = ({
 //   selectedFolderId,
+//   selectedFolderName,
+//   selectedFolderPathSegments,
 //   searchQuery,
 //   user,
 //   isUploadModalOpen,
@@ -86,6 +89,7 @@
 //     rootFoldersCount: rootFolders?.length || 0,
 //     subFoldersCount: subFolders?.length || 0,
 //     selectedFolderId,
+//     selectedFolderName,
 //     filesLoading,
 //     rootFilesLoading,
 //     rootFoldersLoading,
@@ -168,7 +172,8 @@
 
 //   const handleFolderClick = (folder: Folder) => {
 //     console.log("📁 Folder clicked:", folder.name, "ID:", folder.id);
-//     onFolderSelect(folder.id);
+//     // Pass both ID and name back to Dashboard so it can show & store the folder name
+//     onFolderSelect(folder.id, folder.name);
 //   };
 
 //   const handleCreateFolder = () => {
@@ -217,9 +222,10 @@
 //       displayFiles?.map((f) => ({ id: f.id, name: f.name }))
 //     );
 //     console.log("🔍 [FileManagement] Selected folder ID:", selectedFolderId);
+//     console.log("🔍 [FileManagement] Selected folder Name:", selectedFolderName);
 //     console.log("🔍 [FileManagement] Files loading:", filesLoading);
 //     console.log("🔍 [FileManagement] Root files loading:", rootFilesLoading);
-//   }, [displayFiles, selectedFolderId, filesLoading, rootFilesLoading]);
+//   }, [displayFiles, selectedFolderId, selectedFolderName, filesLoading, rootFilesLoading]);
 
 //   const filteredFiles =
 //     displayFiles?.filter((file) =>
@@ -306,11 +312,30 @@
 //             <div>
 //               <h2 className="text-xl font-bold text-gray-900">
 //                 {selectedFolderId
-//                   ? `Folder Contents`
+//                   ? "Folder Contents"
 //                   : "Dashboard - All Files & Folders"}
 //               </h2>
+//               {selectedFolderId && (
+//                 <div className="mt-1 text-sm text-gray-700 font-semibold flex items-center flex-wrap gap-1">
+//                   {selectedFolderPathSegments && selectedFolderPathSegments.length > 0 ? (
+//                     selectedFolderPathSegments.map((segment, index) => (
+//                       <React.Fragment key={`${segment}-${index}`}>
+//                         {index > 0 && <span className="text-gray-400">/</span>}
+//                         <span
+//                           className="truncate max-w-[140px] md:max-w-none"
+//                           title={segment}
+//                         >
+//                           {segment}
+//                         </span>
+//                       </React.Fragment>
+//                     ))
+//                   ) : selectedFolderName ? (
+//                     <span title={selectedFolderName}>{selectedFolderName}</span>
+//                   ) : null}
+//                 </div>
+//               )}
 //               <p className="text-gray-500 mt-1">
-//                 {totalItems} items • {totalSize.toLocaleString()} bytes
+//                 {totalItems} items • {(totalSize / (1024 * 1024)).toFixed(2)} MBs
 //                 {selectedFolderId && (
 //                   <button
 //                     onClick={handleBackToRoot}
@@ -565,6 +590,7 @@
 // };
 
 // export default FileManagement;
+
 import React from "react";
 import {
   FiUpload,
@@ -902,7 +928,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
                 </div>
               )}
               <p className="text-gray-500 mt-1">
-                {totalItems} items • {totalSize.toLocaleString()} bytes
+                {totalItems} items{selectedFolderId && ` • ${(totalSize / (1024 * 1024)).toFixed(2)} MBs`}
                 {selectedFolderId && (
                   <button
                     onClick={handleBackToRoot}

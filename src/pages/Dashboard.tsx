@@ -1,11 +1,11 @@
-// import React, { useState, useEffect } from "react";
+// import React, { useState, useEffect, useMemo } from "react";
 // import { useNavigate } from "react-router-dom";
 // import {
 //   FiHome,
 //   FiUsers,
 //   FiLogOut,
 //   FiMenu,
-//   FiX,
+
 //   // FiStar,
 //   FiTrash2,
 // } from "react-icons/fi";
@@ -49,20 +49,57 @@
 //   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
 
 //   // --- NEW: add titles (tooltips) for truncated file names inside FileManagement ---
+//   // Improved: set the `title` also on the nearest clickable / container ancestor
 //   useEffect(() => {
 //     const container = document.getElementById("file-management-wrapper");
 //     if (!container) return;
 
 //     const setTitles = () => {
-//       // common classes / attributes used to show file name text (covered heuristically)
-//       const candidates = container.querySelectorAll<HTMLElement>(
-//         ".truncate, .file-name, [data-filename], .text-ellipsis, .overflow-ellipsis"
-//       );
+//       // candidates inside FileManagement that usually hold file/folder names
+//       const selectors =
+//         ".truncate, .file-name, [data-filename], .text-ellipsis, .overflow-ellipsis";
+//       const candidates = container.querySelectorAll<HTMLElement>(selectors);
+
 //       candidates.forEach((el) => {
 //         const text = el.innerText?.trim();
-//         if (text && !el.getAttribute("title")) {
+//         if (!text) return;
+
+//         // set title on the text element itself if missing
+//         if (!el.getAttribute("title")) {
 //           el.setAttribute("title", text);
 //         }
+
+//         // Also set the title on a reasonable enclosing clickable/container element
+//         // so hovering the icon or surrounding area shows the same tooltip.
+//         // Check common clickable/container selectors and some file/folder class names
+//         const clickableSelectors =
+//           'button, a, [role="button"], .file-item, .folder-item, .file-row, .folder-row, .project-folder, .folder-card, .file-card';
+//         let clickable: Element | null = null;
+//         try {
+//           clickable = el.closest(clickableSelectors);
+//         } catch {
+//           // In case closest throws for some exotic selector, we'll fallback below
+//           clickable = null;
+//         }
+
+//         // If we found a clickable ancestor, set its title if not already set
+//         if (clickable && clickable instanceof HTMLElement && !clickable.getAttribute("title")) {
+//           clickable.setAttribute("title", text);
+//         } else {
+//           // Fallbacks:
+//           // 1) parent element (covers icon next to name in the same wrapper)
+//           const parent = el.parentElement;
+//           if (parent && !parent.getAttribute("title")) {
+//             parent.setAttribute("title", text);
+//           }
+//           // 2) grandparent as a last resort
+//           else if (parent?.parentElement && !parent.parentElement.getAttribute("title")) {
+//             parent.parentElement.setAttribute("title", text);
+//           }
+//         }
+
+//         // Also ensure any sibling icons (e.g., svg inside the same wrapper) inherit the title via wrapper,
+//         // so hovering over icon will show the tooltip as well.
 //       });
 //     };
 
@@ -145,6 +182,24 @@
 //     navigate("/login");
 //   };
 
+//   const selectedFolderPathSegments = useMemo(() => {
+//     if (!selectedFolderId) {
+//       return [];
+//     }
+
+//     const historyNames = navigationNameHistory.filter(
+//       (name): name is string => !!name && name.trim().length > 0
+//     );
+
+//     const segments = ["Dashboard", ...historyNames];
+
+//     if (selectedFolderName && selectedFolderName.trim().length > 0) {
+//       segments.push(selectedFolderName);
+//     }
+
+//     return segments;
+//   }, [navigationNameHistory, selectedFolderId, selectedFolderName]);
+
 //   const navigationItems = [
 //     {
 //       id: "dashboard",
@@ -218,17 +273,18 @@
 //               />
 //             </div>
 //             <button
-//               onClick={() => setSidebarOpen(!sidebarOpen)}
-//               className="hidden lg:flex p-2 hover:bg-gray-100 rounded-xl transition-colors"
-//             >
-//               <FiX size={18} className="text-gray-500" />
-//             </button>
-//             <button
-//               onClick={() => setMobileSidebarOpen(false)}
-//               className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
-//             >
-//               <FiX size={18} className="text-gray-500" />
-//             </button>
+//   onClick={() => setSidebarOpen(!sidebarOpen)}
+//   className="hidden lg:flex p-2 hover:bg-gray-100 rounded-xl transition-colors"
+// >
+//   <FiMenu size={18} className="text-gray-500" />
+// </button>
+
+// <button
+//   onClick={() => setMobileSidebarOpen(false)}
+//   className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
+// >
+//   <FiMenu size={18} className="text-gray-500" />
+// </button>
 //           </div>
 
 //           {/* Navigation */}
@@ -395,6 +451,7 @@
 //                 <FileManagement
 //                   selectedFolderId={selectedFolderId}
 //                   selectedFolderName={selectedFolderName}
+//                   selectedFolderPathSegments={selectedFolderPathSegments}
 //                   searchQuery=""
 //                   user={user}
 //                   isUploadModalOpen={isUploadModalOpen}
@@ -617,7 +674,7 @@ const Dashboard: React.FC = () => {
       (name): name is string => !!name && name.trim().length > 0
     );
 
-    const segments = ["All Files", ...historyNames];
+    const segments = ["Dashboard", ...historyNames];
 
     if (selectedFolderName && selectedFolderName.trim().length > 0) {
       segments.push(selectedFolderName);
