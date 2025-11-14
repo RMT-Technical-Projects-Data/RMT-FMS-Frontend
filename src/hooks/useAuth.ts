@@ -12,7 +12,6 @@ interface LoginCredentials {
   username: string;
   password: string;
 }
-
 interface LoginResponse {
   token: string;
   user: User;
