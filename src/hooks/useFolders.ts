@@ -23,12 +23,7 @@ const fetchFolder = async (id: number): Promise<Folder> => {
   return response.data as Folder;
 };
 
-const fetchFolderTree = async (): Promise<Folder[]> => {
-  const response = await axios.get(`${API_BASE_URL}/folders/tree/structure`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-  });
-  return response.data as Folder[];
-};
+
 
 const createFolder = async (data: {
   name: string;
@@ -282,7 +277,34 @@ export const useFolder = (id: number) =>
 export const useFolderTree = () =>
   useQuery({
     queryKey: ["folderTree"],
-    queryFn: fetchFolderTree,
+    queryFn: async () => {
+      // Fetch all folders (flat list)
+      const folders = await fetchFolders();
+
+      // Build tree structure client-side
+      const folderMap = new Map<number, Folder>();
+      const rootFolders: Folder[] = [];
+
+      // Initialize map with folders and empty nested arrays
+      folders.forEach((f) => {
+        folderMap.set(f.id, { ...f, nested_folders: [] });
+      });
+
+      // Build hierarchy
+      folders.forEach((f) => {
+        const node = folderMap.get(f.id);
+        if (node) {
+          if (f.parent_id && folderMap.has(f.parent_id)) {
+            const parent = folderMap.get(f.parent_id);
+            parent?.nested_folders?.push(node);
+          } else {
+            rootFolders.push(node);
+          }
+        }
+      });
+
+      return rootFolders;
+    },
     enabled: !!localStorage.getItem("token"),
   });
 

@@ -83,8 +83,7 @@ const uploadFolder = async (data: FormData): Promise<{ files: File[] }> => {
     if (value instanceof File) {
       console.log(`  ${key}: File - ${value.name} (${value.size} bytes)`);
       console.log(
-        `    - webkitRelativePath: ${
-          (value as any).webkitRelativePath || "NOT SET"
+        `    - webkitRelativePath: ${(value as any).webkitRelativePath || "NOT SET"
         }`
       );
     } else {
@@ -460,6 +459,23 @@ const permanentDeleteFile = async (
   return response.data as { message: string };
 };
 
+const moveFile = async ({
+  fileId,
+  targetFolderIds,
+}: {
+  fileId: number;
+  targetFolderIds: number[];
+}): Promise<{ message: string }> => {
+  const response = await axios.post(
+    `${API_BASE_URL}/files/${fileId}/move`,
+    { targetFolderIds },
+    {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    }
+  );
+  return response.data as { message: string };
+};
+
 // Hooks
 export const useFiles = (folderId: number | null = null) =>
   useQuery({
@@ -687,6 +703,23 @@ export const usePermanentDeleteFile = () => {
       toast.error(
         error.response?.data?.message || "Failed to delete file permanently"
       );
+    },
+  });
+};
+
+export const useMoveFile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: moveFile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["folders"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFolders"] });
+      toast.success("File moved successfully!");
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || "Failed to move file");
     },
   });
 };

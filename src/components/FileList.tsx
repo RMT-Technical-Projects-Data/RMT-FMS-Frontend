@@ -22,7 +22,9 @@ import {
   // FiHeart,
   FiRotateCcw,
   FiExternalLink,
+  FiMove,
 } from "react-icons/fi";
+import MoveFileModal from "./MoveFileModal";
 
 interface FileListProps {
   files: File[];
@@ -46,6 +48,20 @@ const FileList: React.FC<FileListProps> = ({
   const restoreFile = useRestoreFile();
   const permanentDeleteFile = usePermanentDeleteFile();
   const { data: userPermissions } = useUserPermissions();
+
+  // State for move modal
+  const [moveModalOpen, setMoveModalOpen] = React.useState(false);
+  const [selectedFileForMove, setSelectedFileForMove] = React.useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+
+  const handleMoveClick = (fileId: number, fileName: string) => {
+    console.log("🖱️ Move icon clicked:", { fileId, fileName });
+    setSelectedFileForMove({ id: fileId, name: fileName });
+    setMoveModalOpen(true);
+    console.log("✅ setMoveModalOpen(true) called");
+  };
 
   // Check if user has download permission for a file
   const hasDownloadPermission = (fileId: number) => {
@@ -313,9 +329,8 @@ const FileList: React.FC<FileListProps> = ({
             return (
               <div
                 key={file.id}
-                className={`flex items-center space-x-4 p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200 ${
-                  canView ? "cursor-pointer" : "cursor-not-allowed opacity-50"
-                } ${isTrashView ? "opacity-75" : ""}`}
+                className={`flex items-center space-x-4 p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200 ${canView ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                  } ${isTrashView ? "opacity-75" : ""}`}
               >
                 <div className={`p-3 rounded-xl ${fileColor}`}>
                   <FileIcon size={24} />
@@ -372,6 +387,20 @@ const FileList: React.FC<FileListProps> = ({
                       />
                     </button>
                   )} */}
+
+                  {/* Move button (left of Open in new window) */}
+                  {canView && !isTrashView && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMoveClick(file.id, file.name);
+                      }}
+                      className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                      title="Move File"
+                    >
+                      <FiMove size={18} />
+                    </button>
+                  )}
 
                   {/* Open in new window button (for view permission) */}
                   {canView && !isTrashView && (
@@ -462,6 +491,17 @@ const FileList: React.FC<FileListProps> = ({
           })}
         </div>
       )}
+      {/* Move File Modal */}
+      <MoveFileModal
+        isOpen={moveModalOpen}
+        onClose={() => {
+          console.log("❌ Closing move modal");
+          setMoveModalOpen(false);
+          setSelectedFileForMove(null);
+        }}
+        fileId={selectedFileForMove?.id || null}
+        fileName={selectedFileForMove?.name || ""}
+      />
     </div>
   );
 };

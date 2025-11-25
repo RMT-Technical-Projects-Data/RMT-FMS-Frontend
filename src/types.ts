@@ -14,6 +14,7 @@ export interface Folder {
   updated_at: string;
   is_deleted: boolean;
   folder_name?: string; // For joined queries
+  nested_folders?: Folder[];
 }
 
 export interface File {
