@@ -13,6 +13,7 @@ export interface Folder {
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
+  deleted_at?: string | null;
   folder_name?: string; // For joined queries
   nested_folders?: Folder[];
 }
@@ -30,6 +31,7 @@ export interface File {
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
+  deleted_at?: string | null;
   folder_name?: string; // For joined queries
 }
 

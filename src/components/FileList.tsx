@@ -23,6 +23,7 @@ import {
   FiRotateCcw,
   FiExternalLink,
   FiMove,
+  FiClock,
 } from "react-icons/fi";
 import MoveFileModal from "./MoveFileModal";
 
@@ -302,6 +303,19 @@ const FileList: React.FC<FileListProps> = ({
     return "text-blue-600 bg-blue-50";
   };
 
+  const calculateRemainingDays = (deletedAt?: string | null) => {
+    if (!deletedAt) return 30;
+    const deletedDate = new Date(deletedAt);
+    const deletionDeadline = new Date(deletedDate);
+    deletionDeadline.setDate(deletedDate.getDate() + 30);
+
+    const now = new Date();
+    const timeDiff = deletionDeadline.getTime() - now.getTime();
+    const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+    return daysLeft > 0 ? daysLeft : 0;
+  };
+
   return (
     <div className="space-y-4">
       {files.length === 0 ? (
@@ -346,6 +360,15 @@ const FileList: React.FC<FileListProps> = ({
                     <span>
                       {new Date(file.created_at).toLocaleDateString()}
                     </span>
+                    {isTrashView && (
+                      <>
+                        <span>•</span>
+                        <span className="text-red-500 text-xs font-medium flex items-center">
+                          <FiClock className="mr-1" size={12} />
+                          {calculateRemainingDays(file.deleted_at)} days left
+                        </span>
+                      </>
+                    )}
                     {/* {file.mime_type && (
                       <>
                         <span>•</span>
