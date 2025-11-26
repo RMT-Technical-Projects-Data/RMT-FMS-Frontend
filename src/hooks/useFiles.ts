@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import type { File } from "../types";
 
 const API_BASE_URL = "https://rmtfms.duckdns.org/api";
-
+//const API_BASE_URL = "http://localhost:3000/api";
 // File functions
 const fetchFiles = async (folderId: number | null = null): Promise<File[]> => {
   const url = folderId

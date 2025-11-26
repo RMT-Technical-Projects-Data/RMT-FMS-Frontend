@@ -657,7 +657,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
   setPermissionResource,
   onFolderSelect,
   onBackNavigation,
-  showToast = () => {}, // Default empty function
+  showToast = () => { }, // Default empty function
 }) => {
   const { data: files, isLoading: filesLoading } = useFiles(selectedFolderId);
   const { data: rootFiles, isLoading: rootFilesLoading } = useRootFiles();
@@ -1029,23 +1029,22 @@ const FileManagement: React.FC<FileManagementProps> = ({
                           {openDropdownId === folder.id && (
                             <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                               <div className="py-1">
-                                {user.role === "super_admin" &&
-                                  !folder.parent_id && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleAssignPermission(
-                                          folder.id,
-                                          "folder"
-                                        );
-                                        setOpenDropdownId(null);
-                                      }}
-                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                    >
-                                      <FiKey className="mr-3" size={16} />
-                                      Permissions
-                                    </button>
-                                  )}
+                                {user.role === "super_admin" && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAssignPermission(
+                                        folder.id,
+                                        "folder"
+                                      );
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  >
+                                    <FiKey className="mr-3" size={16} />
+                                    Permissions
+                                  </button>
+                                )}
                                 {hasDownloadPermission(folder.id) && (
                                   <button
                                     onClick={(e) => {

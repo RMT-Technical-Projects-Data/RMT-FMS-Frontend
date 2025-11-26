@@ -103,7 +103,7 @@ import axios from "axios";
 import type { Permission } from "../types";
 
 const API_BASE_URL = "https://rmtfms.duckdns.org/api";
-
+// const API_BASE_URL = "http://localhost:3000/api";
 // Permission functions
 const assignPermission = async (
   data: Omit<Permission, "id" | "created_at" | "updated_at">
