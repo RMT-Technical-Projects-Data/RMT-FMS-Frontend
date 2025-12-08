@@ -412,7 +412,7 @@ const FileList: React.FC<FileListProps> = ({
                   )} */}
 
                   {/* Move button (left of Open in new window) */}
-                  {canView && !isTrashView && (
+                  {canView && !isTrashView && userRole === "super_admin" && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
