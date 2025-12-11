@@ -106,14 +106,22 @@ const UploadModal: React.FC<UploadModalProps> = ({
 
     if (!files || files.length === 0) {
       alert(
-        `Please select ${
-          uploadType === "folder" ? "a folder" : "file(s)"
+        `Please select ${uploadType === "folder" ? "a folder" : "file(s)"
         } to upload.`
       );
       return;
     }
 
     const formData = new FormData();
+
+    // 0. Append folderId FIRST (Global metadata)
+    if (folderId !== null) {
+      if (uploadType === "folder") {
+        formData.append("folderId", folderId.toString()); // For folder upload
+      } else {
+        formData.append("folder_id", folderId.toString()); // For file upload (backend expects folder_id)
+      }
+    }
 
     if (uploadType === "folder") {
       // Check if we have webkitRelativePath for folder structure
@@ -126,13 +134,16 @@ const UploadModal: React.FC<UploadModalProps> = ({
       if (hasWebkitRelativePath) {
         // Full folder structure with webkitRelativePath (file picker)
         const folderSet = new Set<string>();
+        // const relativePaths: string[] = [];
 
+        // 1. Collect and append files/paths
         for (const file of Array.from(files)) {
+          const relPath = (file as any).webkitRelativePath;
           formData.append("files", file);
-          formData.append("paths", (file as any).webkitRelativePath);
+          formData.append("paths", relPath);
 
           // Collect folder paths for empty folder creation
-          const pathParts = (file as any).webkitRelativePath.split("/");
+          const pathParts = relPath.split("/");
           pathParts.pop(); // remove filename
           let cumulativePath = "";
           for (const part of pathParts) {
@@ -144,17 +155,15 @@ const UploadModal: React.FC<UploadModalProps> = ({
         // Send unique folder paths (includes empty ones)
         formData.append("allPaths", JSON.stringify([...folderSet]));
       } else {
-        // Drag & drop folder upload - create a simple folder structure
+        // Drag & drop folder upload - legacy simple structure
+        // Note: For drag-drop, file.webkitRelativePath is usually empty or specific. 
+        // We stick to simple logic here but ensure ID is already added.
+        formData.append("allPaths", JSON.stringify([]));
+
         for (const file of Array.from(files)) {
           formData.append("files", file);
-          formData.append("paths", file.name); // Use filename as path
+          formData.append("paths", file.name); // Legacy path usage
         }
-        formData.append("allPaths", JSON.stringify([]));
-      }
-
-      // Add folderId to formData for folder uploads
-      if (folderId !== null) {
-        formData.append("folderId", folderId.toString());
       }
 
       // Use the React Query mutation for folder upload
@@ -172,11 +181,6 @@ const UploadModal: React.FC<UploadModalProps> = ({
       // Handle single file uploads
       for (const file of Array.from(files)) {
         formData.append("files", file);
-      }
-
-      // Add folderId to formData for file uploads (backend expects folder_id)
-      if (folderId !== null) {
-        formData.append("folder_id", folderId.toString());
       }
 
       uploadFileMutation.mutate(formData, {
@@ -231,22 +235,20 @@ const UploadModal: React.FC<UploadModalProps> = ({
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => handleUploadTypeChange("file")}
-                className={`p-4 border-2 rounded-xl text-center transition-all ${
-                  uploadType === "file"
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-gray-200 hover:border-gray-300 text-gray-600"
-                }`}
+                className={`p-4 border-2 rounded-xl text-center transition-all ${uploadType === "file"
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-gray-200 hover:border-gray-300 text-gray-600"
+                  }`}
               >
                 <FiFile size={24} className="mx-auto mb-2" />
                 <div className="font-medium">File(s)</div>
               </button>
               <button
                 onClick={() => handleUploadTypeChange("folder")}
-                className={`p-4 border-2 rounded-xl text-center transition-all ${
-                  uploadType === "folder"
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-gray-200 hover:border-gray-300 text-gray-600"
-                }`}
+                className={`p-4 border-2 rounded-xl text-center transition-all ${uploadType === "folder"
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-gray-200 hover:border-gray-300 text-gray-600"
+                  }`}
               >
                 <FiFolder size={24} className="mx-auto mb-2" />
                 <div className="font-medium">Folder</div>
@@ -255,13 +257,12 @@ const UploadModal: React.FC<UploadModalProps> = ({
 
             {/* Drop Zone */}
             <div
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
-                uploadType === "file" && isDragging
-                  ? "border-blue-500 bg-blue-50"
-                  : uploadType === "folder" && isDragging
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${uploadType === "file" && isDragging
+                ? "border-blue-500 bg-blue-50"
+                : uploadType === "folder" && isDragging
                   ? "border-red-500 bg-red-50"
                   : "border-gray-300 hover:border-gray-400"
-              }`}
+                }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -344,7 +345,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
               className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploadFileMutation.isPending ||
-              uploadFolderMutation.isPending ? (
+                uploadFolderMutation.isPending ? (
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>Uploading...</span>
