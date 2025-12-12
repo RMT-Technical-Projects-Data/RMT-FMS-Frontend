@@ -1,4 +1,3 @@
-// // components/TrashView.tsx
 // import React from "react";
 // import {
 //   FiFolder,
@@ -7,10 +6,9 @@
 //   FiRotateCcw,
 //   FiArrowLeft,
 //   FiClock,
-//   //FiCheckSquare, // Added icon
 // } from "react-icons/fi";
 // import FileList from "./FileList";
-// import { useTrashFilesByFolder, usePermanentDeleteFile } from "../hooks/useFiles"; // Added usePermanentDeleteFile
+// import { useTrashFilesByFolder, useBulkPermanentDeleteFiles } from "../hooks/useFiles";
 // import { useTrashFoldersByParent, useRestoreFolder, usePermanentDeleteFolder } from "../hooks/useFolders";
 // // import { useUserPermissions } from "../hooks/usePermissions";
 // import type { User, Folder } from "../types";
@@ -32,19 +30,18 @@
 // }) => {
 //   const { data: trashFiles, isLoading: filesLoading } = useTrashFilesByFolder(selectedFolderId);
 //   const { data: trashFolders, isLoading: foldersLoading } = useTrashFoldersByParent(selectedFolderId);
-//   // const { data: userPermissions } = useUserPermissions();
 
-//   // Mutation hooks for restore and permanent delete
-//   // const restoreFile = useRestoreFile();
-//   const permanentDeleteFile = usePermanentDeleteFile(); // Uncommented/Added
+//   // Mutation hooks
+
+//   const bulkPermanentDeleteFiles = useBulkPermanentDeleteFiles();
 //   const restoreFolder = useRestoreFolder();
 //   const permanentDeleteFolder = usePermanentDeleteFolder();
 
 //   // State for dropdown management
 //   const [openDropdownId, setOpenDropdownId] = React.useState<number | null>(null);
 
-//   // State for Select All
-//   const [isAllFilesSelected, setIsAllFilesSelected] = React.useState(false);
+//   // State for File Selection (Array of IDs allows individual selection)
+//   const [selectedFileIds, setSelectedFileIds] = React.useState<number[]>([]);
 
 //   // Close dropdown when clicking outside
 //   React.useEffect(() => {
@@ -60,7 +57,7 @@
 
 //   // Reset selection when folder changes
 //   React.useEffect(() => {
-//     setIsAllFilesSelected(false);
+//     setSelectedFileIds([]);
 //   }, [selectedFolderId]);
 
 //   const handleFolderClick = (folder: Folder) => {
@@ -112,25 +109,49 @@
 //     setOpenDropdownId(null);
 //   };
 
-//   // Logic to delete all selected files
-//   const handleDeleteAllFiles = () => {
-//     if (!trashFiles || trashFiles.length === 0) return;
+//   // --- Selection Logic ---
 
-//     const confirmMessage = `Are you sure you want to permanently delete all ${trashFiles.length} files in this view? This action cannot be undone.`;
+//   // 1. Toggle Single File
+//   const handleToggleFileSelection = (fileId: number) => {
+//     setSelectedFileIds((prev) =>
+//       prev.includes(fileId)
+//         ? prev.filter((id) => id !== fileId)
+//         : [...prev, fileId]
+//     );
+//   };
 
-//     if (window.confirm(confirmMessage)) {
-//       // Iterate and delete each file
-//       trashFiles.forEach((file) => {
-//         permanentDeleteFile.mutate(file.id, {
-//           onError: (error: any) => {
-//             console.error(`❌ Failed to delete file ${file.name}:`, error);
-//           }
-//         });
-//       });
-//       setIsAllFilesSelected(false);
-//       console.log("✅ Bulk delete initiated for files");
+//   // 2. Toggle "Select All"
+//   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+//     if (e.target.checked && trashFiles) {
+//       // Select all IDs
+//       setSelectedFileIds(trashFiles.map((f) => f.id));
+//     } else {
+//       // Clear selection
+//       setSelectedFileIds([]);
 //     }
 //   };
+
+//   // 3. Delete Selected Files
+//   const handleDeleteSelectedFiles = () => {
+//     if (selectedFileIds.length === 0) return;
+
+//     const confirmMessage = `Are you sure you want to permanently delete these ${selectedFileIds.length} files? This action cannot be undone.`;
+
+//     if (window.confirm(confirmMessage)) {
+//       bulkPermanentDeleteFiles.mutate(selectedFileIds, {
+//         onSuccess: () => {
+//           setSelectedFileIds([]);
+//           console.log("✅ Bulk delete successful");
+//         },
+//         onError: (error: any) => {
+//           console.error("❌ Bulk delete failed:", error);
+//         }
+//       });
+//     }
+//   };
+
+//   // Helper to check if "Select All" box should be checked
+//   const isAllSelected = trashFiles && trashFiles.length > 0 && selectedFileIds.length === trashFiles.length;
 
 //   const calculateRemainingDays = (deletedAt?: string | null) => {
 //     if (!deletedAt) return 30;
@@ -180,27 +201,27 @@
 //           </div>
 //         </div>
 
-//         {/* Select All & Delete All Controls */}
+//         {/* Select All & Delete Selected Controls */}
 //         <div className="flex items-center space-x-4">
 //           {trashFiles && trashFiles.length > 0 && (
 //             <>
 //               <label className="flex items-center space-x-2 cursor-pointer select-none px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
 //                 <input
 //                   type="checkbox"
-//                   checked={isAllFilesSelected}
-//                   onChange={(e) => setIsAllFilesSelected(e.target.checked)}
+//                   checked={isAllSelected}
+//                   onChange={handleSelectAll}
 //                   className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
 //                 />
 //                 <span className="text-sm font-medium text-gray-700">Select All Files</span>
 //               </label>
 
-//               {isAllFilesSelected && (
+//               {selectedFileIds.length > 0 && (
 //                 <button
-//                   onClick={handleDeleteAllFiles}
+//                   onClick={handleDeleteSelectedFiles}
 //                   className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors shadow-sm"
 //                 >
 //                   <FiTrash2 size={16} />
-//                   <span>Delete All ({trashFiles.length})</span>
+//                   <span>Delete Selected ({selectedFileIds.length})</span>
 //                 </button>
 //               )}
 //             </>
@@ -299,6 +320,9 @@
 //                 userId={user.id}
 //                 showFavouriteToggle={false}
 //                 isTrashView={true}
+//                 // 👇 Passing the selection props so checkboxes appear in the list
+//                 selectedFileIds={selectedFileIds}
+//                 onToggleSelection={handleToggleFileSelection}
 //               />
 //             </div>
 //           )}
@@ -359,7 +383,6 @@ const TrashView: React.FC<TrashViewProps> = ({
   const { data: trashFolders, isLoading: foldersLoading } = useTrashFoldersByParent(selectedFolderId);
 
   // Mutation hooks
-
   const bulkPermanentDeleteFiles = useBulkPermanentDeleteFiles();
   const restoreFolder = useRestoreFolder();
   const permanentDeleteFolder = usePermanentDeleteFolder();
@@ -367,8 +390,9 @@ const TrashView: React.FC<TrashViewProps> = ({
   // State for dropdown management
   const [openDropdownId, setOpenDropdownId] = React.useState<number | null>(null);
 
-  // State for File Selection (Array of IDs allows individual selection)
+  // State for Selection
   const [selectedFileIds, setSelectedFileIds] = React.useState<number[]>([]);
+  const [selectedFolderIds, setSelectedFolderIds] = React.useState<number[]>([]);
 
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -382,9 +406,10 @@ const TrashView: React.FC<TrashViewProps> = ({
     }
   }, [openDropdownId]);
 
-  // Reset selection when folder changes
+  // Reset selection when current directory changes
   React.useEffect(() => {
     setSelectedFileIds([]);
+    setSelectedFolderIds([]);
   }, [selectedFolderId]);
 
   const handleFolderClick = (folder: Folder) => {
@@ -447,38 +472,69 @@ const TrashView: React.FC<TrashViewProps> = ({
     );
   };
 
-  // 2. Toggle "Select All"
+  // 2. Toggle Single Folder
+  const handleToggleFolderSelection = (folderId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent entering the folder
+    setSelectedFolderIds((prev) =>
+      prev.includes(folderId)
+        ? prev.filter((id) => id !== folderId)
+        : [...prev, folderId]
+    );
+  };
+
+  // 3. Toggle "Select All" (Files AND Folders)
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked && trashFiles) {
-      // Select all IDs
-      setSelectedFileIds(trashFiles.map((f) => f.id));
+    if (e.target.checked) {
+      // Select all files
+      if (trashFiles) setSelectedFileIds(trashFiles.map((f) => f.id));
+      // Select all folders
+      if (trashFolders) setSelectedFolderIds(trashFolders.map((f) => f.id));
     } else {
-      // Clear selection
+      // Clear all
       setSelectedFileIds([]);
+      setSelectedFolderIds([]);
     }
   };
 
-  // 3. Delete Selected Files
-  const handleDeleteSelectedFiles = () => {
-    if (selectedFileIds.length === 0) return;
+  // 4. Delete All Selected Items
+  const handleDeleteSelectedItems = () => {
+    const totalSelected = selectedFileIds.length + selectedFolderIds.length;
+    if (totalSelected === 0) return;
 
-    const confirmMessage = `Are you sure you want to permanently delete these ${selectedFileIds.length} files? This action cannot be undone.`;
+    const confirmMessage = `Are you sure you want to permanently delete these ${totalSelected} items? This action cannot be undone and will delete all contents inside selected folders.`;
 
     if (window.confirm(confirmMessage)) {
-      bulkPermanentDeleteFiles.mutate(selectedFileIds, {
-        onSuccess: () => {
-          setSelectedFileIds([]);
-          console.log("✅ Bulk delete successful");
-        },
-        onError: (error: any) => {
-          console.error("❌ Bulk delete failed:", error);
-        }
-      });
+
+      // Delete Files (Bulk)
+      if (selectedFileIds.length > 0) {
+        bulkPermanentDeleteFiles.mutate(selectedFileIds, {
+          onSuccess: () => {
+            setSelectedFileIds([]);
+            console.log("✅ Bulk file delete successful");
+          },
+          onError: (error: any) => {
+            console.error("❌ Bulk file delete failed:", error);
+          }
+        });
+      }
+
+      // Delete Folders (Iterative - since we don't have a bulk folder hook yet)
+      if (selectedFolderIds.length > 0) {
+        selectedFolderIds.forEach(id => {
+          permanentDeleteFolder.mutate(id, {
+            onError: (error: any) => console.error(`❌ Failed to delete folder ${id}`, error)
+          });
+        });
+        setSelectedFolderIds([]);
+      }
     }
   };
 
   // Helper to check if "Select All" box should be checked
-  const isAllSelected = trashFiles && trashFiles.length > 0 && selectedFileIds.length === trashFiles.length;
+  const totalAvailableItems = (trashFiles?.length || 0) + (trashFolders?.length || 0);
+  const totalSelectedItems = selectedFileIds.length + selectedFolderIds.length;
+
+  const isAllSelected = totalAvailableItems > 0 && totalSelectedItems === totalAvailableItems;
 
   const calculateRemainingDays = (deletedAt?: string | null) => {
     if (!deletedAt) return 30;
@@ -494,7 +550,6 @@ const TrashView: React.FC<TrashViewProps> = ({
   };
 
   const isLoading = filesLoading || foldersLoading;
-  const totalItems = (trashFiles?.length || 0) + (trashFolders?.length || 0);
 
   return (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 p-6">
@@ -520,7 +575,7 @@ const TrashView: React.FC<TrashViewProps> = ({
               )}
             </h2>
             <p className="text-gray-500 mt-1">
-              {totalItems} deleted items
+              {totalAvailableItems} deleted items
             </p>
             <p className="text-red-500 text-sm mt-1 font-medium">
               The files and folders will be deleted permanently after 30 days
@@ -530,7 +585,7 @@ const TrashView: React.FC<TrashViewProps> = ({
 
         {/* Select All & Delete Selected Controls */}
         <div className="flex items-center space-x-4">
-          {trashFiles && trashFiles.length > 0 && (
+          {totalAvailableItems > 0 && (
             <>
               <label className="flex items-center space-x-2 cursor-pointer select-none px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
                 <input
@@ -539,16 +594,16 @@ const TrashView: React.FC<TrashViewProps> = ({
                   onChange={handleSelectAll}
                   className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
                 />
-                <span className="text-sm font-medium text-gray-700">Select All Files</span>
+                <span className="text-sm font-medium text-gray-700">Select All</span>
               </label>
 
-              {selectedFileIds.length > 0 && (
+              {totalSelectedItems > 0 && (
                 <button
-                  onClick={handleDeleteSelectedFiles}
+                  onClick={handleDeleteSelectedItems}
                   className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors shadow-sm"
                 >
                   <FiTrash2 size={16} />
-                  <span>Delete Selected ({selectedFileIds.length})</span>
+                  <span>Delete Selected ({totalSelectedItems})</span>
                 </button>
               )}
             </>
@@ -571,12 +626,29 @@ const TrashView: React.FC<TrashViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {trashFolders.map((folder) => {
                   const daysLeft = calculateRemainingDays(folder.deleted_at);
+                  const isSelected = selectedFolderIds.includes(folder.id);
+
                   return (
                     <div
                       key={folder.id}
                       onClick={() => handleFolderClick(folder)}
-                      className="flex items-center p-4 bg-gray-50 rounded-xl border border-gray-200 hover:shadow-md transition-all cursor-pointer group relative opacity-75"
+                      className={`flex items-center p-4 bg-gray-50 rounded-xl border transition-all cursor-pointer group relative opacity-75
+                        ${isSelected ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-gray-200 hover:shadow-md'}
+                      `}
                     >
+                      {/* Checkbox for Folder */}
+                      <div
+                        className="mr-3"
+                        onClick={(e) => handleToggleFolderSelection(folder.id, e)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          readOnly
+                          className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </div>
+
                       <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-500 rounded-lg flex items-center justify-center shadow-lg mr-4">
                         <FiFolder className="text-white" size={20} />
                       </div>
@@ -647,7 +719,7 @@ const TrashView: React.FC<TrashViewProps> = ({
                 userId={user.id}
                 showFavouriteToggle={false}
                 isTrashView={true}
-                // 👇 Passing the selection props so checkboxes appear in the list
+                // Selection props
                 selectedFileIds={selectedFileIds}
                 onToggleSelection={handleToggleFileSelection}
               />
@@ -655,7 +727,7 @@ const TrashView: React.FC<TrashViewProps> = ({
           )}
 
           {/* Empty State */}
-          {totalItems === 0 && !isLoading && (
+          {totalAvailableItems === 0 && !isLoading && (
             <div className="text-center py-16">
               <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <FiTrash2 className="text-gray-400" size={32} />
