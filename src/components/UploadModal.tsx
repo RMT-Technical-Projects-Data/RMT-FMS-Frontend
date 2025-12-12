@@ -7,12 +7,14 @@ interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   folderId: number | null;
+  existingFolderNames?: string[];
 }
 
 const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
   folderId,
+  existingFolderNames = [],
 }) => {
   const [uploadType, setUploadType] = useState<"file" | "folder">("file");
   const [files, setFiles] = useState<FileList | null>(null);
@@ -154,6 +156,26 @@ const UploadModal: React.FC<UploadModalProps> = ({
 
         // Send unique folder paths (includes empty ones)
         formData.append("allPaths", JSON.stringify([...folderSet]));
+
+        // Check for duplicate top-level folders
+        const topLevelFolders = new Set<string>();
+        Array.from(files).forEach((file) => {
+          const relPath = (file as any).webkitRelativePath;
+          if (relPath) {
+            const rootFolder = relPath.split("/")[0];
+            topLevelFolders.add(rootFolder);
+          }
+        });
+
+        // Check each top-level folder against existing folder names in the CURRENT directory
+        for (const folderName of topLevelFolders) {
+          if (existingFolderNames.includes(folderName)) {
+            alert(
+              `Folder '${folderName}' already exists in this directory. Please rename the folder or choose a different directory.`
+            );
+            return; // Stop upload
+          }
+        }
       } else {
         // Drag & drop folder upload - legacy simple structure
         // Note: For drag-drop, file.webkitRelativePath is usually empty or specific. 

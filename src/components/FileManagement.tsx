@@ -1157,6 +1157,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         folderId={selectedFolderId}
+        existingFolderNames={displayFolders?.map((f) => f.name) || []}
       />
 
       {/* Create Folder Modal */}
