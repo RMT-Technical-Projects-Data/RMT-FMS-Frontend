@@ -335,7 +335,7 @@ import {
   FiClock,
 } from "react-icons/fi";
 import FileList from "./FileList";
-import { useTrashFilesByFolder, usePermanentDeleteFile } from "../hooks/useFiles";
+import { useTrashFilesByFolder, useBulkPermanentDeleteFiles } from "../hooks/useFiles";
 import { useTrashFoldersByParent, useRestoreFolder, usePermanentDeleteFolder } from "../hooks/useFolders";
 // import { useUserPermissions } from "../hooks/usePermissions";
 import type { User, Folder } from "../types";
@@ -359,7 +359,8 @@ const TrashView: React.FC<TrashViewProps> = ({
   const { data: trashFolders, isLoading: foldersLoading } = useTrashFoldersByParent(selectedFolderId);
 
   // Mutation hooks
-  const permanentDeleteFile = usePermanentDeleteFile();
+
+  const bulkPermanentDeleteFiles = useBulkPermanentDeleteFiles();
   const restoreFolder = useRestoreFolder();
   const permanentDeleteFolder = usePermanentDeleteFolder();
 
@@ -464,15 +465,15 @@ const TrashView: React.FC<TrashViewProps> = ({
     const confirmMessage = `Are you sure you want to permanently delete these ${selectedFileIds.length} files? This action cannot be undone.`;
 
     if (window.confirm(confirmMessage)) {
-      selectedFileIds.forEach((id) => {
-        permanentDeleteFile.mutate(id, {
-          onError: (error: any) => {
-            console.error(`❌ Failed to delete file ID ${id}:`, error);
-          }
-        });
+      bulkPermanentDeleteFiles.mutate(selectedFileIds, {
+        onSuccess: () => {
+          setSelectedFileIds([]);
+          console.log("✅ Bulk delete successful");
+        },
+        onError: (error: any) => {
+          console.error("❌ Bulk delete failed:", error);
+        }
       });
-      setSelectedFileIds([]);
-      console.log("✅ Bulk delete initiated for selected files");
     }
   };
 

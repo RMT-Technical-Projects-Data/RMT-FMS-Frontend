@@ -723,3 +723,24 @@ export const useMoveFile = () => {
     },
   });
 };
+export const useBulkPermanentDeleteFiles = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      // Execute all deletions in parallel
+      await Promise.all(ids.map((id) => permanentDeleteFile(id)));
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["favouriteFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["trashFiles"] });
+      toast.success(`${variables.length} files permanently deleted!`);
+    },
+    onError: (error: any) => {
+      toast.error(
+        error.response?.data?.message || "Failed to delete some files permanently"
+      );
+    },
+  });
+};

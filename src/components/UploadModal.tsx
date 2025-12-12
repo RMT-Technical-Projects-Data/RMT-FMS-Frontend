@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Dialog } from "@headlessui/react";
 import { useUploadFile, useUploadFolder } from "../hooks/useFiles";
 import { FiUpload, FiX, FiFile, FiFolder, FiCloud } from "react-icons/fi";
+import { toast } from "react-toastify";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -170,7 +171,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
         // Check each top-level folder against existing folder names in the CURRENT directory
         for (const folderName of topLevelFolders) {
           if (existingFolderNames.includes(folderName)) {
-            alert(
+            toast.error(
               `Folder '${folderName}' already exists in this directory. Please rename the folder or choose a different directory.`
             );
             return; // Stop upload
