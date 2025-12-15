@@ -4,8 +4,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import type { Folder } from "../types";
 
-//const API_BASE_URL = "https://rmtfms.duckdns.org/api";
-const API_BASE_URL = "http://localhost:3000/api";
+import { API_BASE_URL } from "../config";
 // -----------------------------
 // Folder APIs (metadata only)
 // -----------------------------
@@ -471,7 +470,12 @@ export const useRestoreFolder = () => {
       toast.success("Folder restored successfully!");
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to restore folder");
+      console.error("Restore folder error:", error);
+      toast.error(
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        "Failed to restore folder"
+      );
     },
   });
 };

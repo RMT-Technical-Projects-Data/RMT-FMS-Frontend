@@ -437,10 +437,6 @@ const TrashView: React.FC<TrashViewProps> = ({
         onSuccess: () => {
           console.log("✅ Folder restored successfully");
         },
-        onError: (error: any) => {
-          console.error("❌ Failed to restore folder:", error);
-          alert("Failed to restore folder. Please try again.");
-        },
       });
     }
     setOpenDropdownId(null);

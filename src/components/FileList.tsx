@@ -533,6 +533,7 @@
 
 // components/FileList.tsx
 import React from "react";
+import { API_BASE_URL } from "../config";
 import type { File } from "../types";
 import {
   // useDownloadFile,
@@ -700,7 +701,7 @@ const FileList: React.FC<FileListProps> = ({
       }
 
       // Use the correct backend endpoint: /files/download/{id}
-      const fileUrl = `https://rmtfms.duckdns.org/api/files/download/${file.id}`;
+      const fileUrl = `http://localhost:3000/api/files/download/${file.id}`;
       console.log(`📥 Downloading from: ${fileUrl}`);
 
       const response = await fetch(fileUrl, {
@@ -745,9 +746,11 @@ const FileList: React.FC<FileListProps> = ({
 
   const handleOpenFile = async (fileId: number, token: string) => {
     try {
+
+
       // 1️⃣ Ask backend for short-lived signed URL
       const res = await fetch(
-        `https://rmtfms.duckdns.org/api/files/open/${fileId}/url`,
+        `${API_BASE_URL}/files/open/${fileId}/url`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
