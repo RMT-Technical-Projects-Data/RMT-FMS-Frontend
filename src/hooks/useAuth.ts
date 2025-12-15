@@ -59,7 +59,6 @@ export const useUsers = () =>
 
 export const useUpdateUser = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: updateUser,
     onSuccess: (data, variables) => {
