@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import {
   FiUsers,
   FiUserPlus,
-  FiRefreshCw,
   FiEdit2,
   FiTrash2,
   FiX,
@@ -87,13 +86,7 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
             </p>
           </div>
           <div className="flex items-center space-x-3">
-            <button
-              onClick={() => refetchUsers()}
-              className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all hover:shadow-md"
-            >
-              <FiRefreshCw size={16} />
-              <span>Refresh</span>
-            </button>
+
             <button
               onClick={handleAddUser}
               className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all transform hover:scale-105"
@@ -149,11 +142,10 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
                         )}
                       </h3>
                       <p
-                        className={`text-sm capitalize ${
-                          userItem.role === "super_admin"
-                            ? "text-purple-600 font-medium"
-                            : "text-gray-500"
-                        }`}
+                        className={`text-sm capitalize ${userItem.role === "super_admin"
+                          ? "text-purple-600 font-medium"
+                          : "text-gray-500"
+                          }`}
                       >
                         {userItem.role}
                       </p>
