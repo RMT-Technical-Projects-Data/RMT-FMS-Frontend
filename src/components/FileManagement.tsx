@@ -903,7 +903,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
               </button>
             )}
             <div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-gray-900" title="">
                 {selectedFolderId
                   ? "Folder Contents"
                   : "Dashboard - All Files & Folders"}
