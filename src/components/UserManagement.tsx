@@ -168,7 +168,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6" autoComplete="off">
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                 <div className="flex items-start space-x-3">
@@ -228,6 +228,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     placeholder="Enter username"
                     required
+                    autoComplete="off"
                   />
                 </div>
               </div>
@@ -250,16 +251,16 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={handlePasswordChange}
-                    className={`w-full pr-10 pl-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-                      passwordError
+                    className={`w-full pr-10 pl-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${passwordError
                         ? "border-red-500 focus:border-red-500"
                         : "border border-gray-200 focus:border-blue-500"
-                    }`}
+                      }`}
                     placeholder={
                       editingUser ? "Enter new password" : "Enter password"
                     }
                     required={!editingUser}
                     minLength={8}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -302,11 +303,10 @@ const UserManagement: React.FC<UserManagementProps> = ({
                       setRole(e.target.value as "super_admin" | "user")
                     }
                     disabled={!!isEditingSelf}
-                    className={`w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${
-                      isEditingSelf
+                    className={`w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white ${isEditingSelf
                         ? "bg-gray-50 text-gray-500 cursor-not-allowed"
                         : ""
-                    }`}
+                      }`}
                   >
                     <option value="user">User</option>
                     <option value="super_admin">Super Admin</option>

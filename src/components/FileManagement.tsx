@@ -928,7 +928,8 @@ const FileManagement: React.FC<FileManagementProps> = ({
                 </div>
               )}
               <p className="text-gray-500 mt-1">
-                {totalItems} items{selectedFolderId && ` • ${(totalSize / (1024 * 1024)).toFixed(2)} MBs`}
+                {totalItems} items
+                {selectedFolderId && totalSize > 0 && ` • ${(totalSize / (1024 * 1024)).toFixed(2)} MBs`}
                 {selectedFolderId && (
                   <button
                     onClick={handleBackToRoot}
