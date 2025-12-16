@@ -703,6 +703,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
 
   // Check if user has download permission for a folder
   const hasDownloadPermission = (folderId: number) => {
+    if (user.role === "super_admin") return true;
     if (!userPermissions) return false;
 
     // Check if folder is owned by user (owners have all permissions)

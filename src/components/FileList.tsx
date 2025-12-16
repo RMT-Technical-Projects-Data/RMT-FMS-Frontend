@@ -607,6 +607,7 @@ const FileList: React.FC<FileListProps> = ({
 
   // Check if user has download permission for a file
   const hasDownloadPermission = (fileId: number) => {
+    if (userRole === "super_admin") return true;
     if (!userPermissions) return false;
 
     // Check if file is owned by user (owners have all permissions)
@@ -641,6 +642,7 @@ const FileList: React.FC<FileListProps> = ({
 
   // Check if user has view permission for a file
   const hasViewPermission = (fileId: number) => {
+    if (userRole === "super_admin") return true;
     if (!userPermissions) return false;
 
     // Check if file is owned by user (owners have all permissions)
