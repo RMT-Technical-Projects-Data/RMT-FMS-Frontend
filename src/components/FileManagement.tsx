@@ -933,7 +933,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
                 {selectedFolderId && (
                   <button
                     onClick={handleBackToRoot}
-                    className="ml-4 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    className="ml-4 text-blue-600 text-sm font-medium"
                   >
                     ← Back to Dashboard
                   </button>
