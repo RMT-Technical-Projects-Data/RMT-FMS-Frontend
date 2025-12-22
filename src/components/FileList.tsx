@@ -541,6 +541,7 @@ import {
   // useToggleFileFavourite,
   useRestoreFile,
   usePermanentDeleteFile,
+  useUpdateFile,
 } from "../hooks/useFiles";
 import { useUserPermissions } from "../hooks/usePermissions";
 import {
@@ -558,6 +559,7 @@ import {
   FiExternalLink,
   FiMove,
   FiClock,
+  FiEdit3,
 } from "react-icons/fi";
 import MoveFileModal from "./MoveFileModal";
 
@@ -586,6 +588,7 @@ const FileList: React.FC<FileListProps> = ({
 }) => {
   // const downloadFile = useDownloadFile();
   const deleteFile = useDeleteFile();
+  const updateFile = useUpdateFile();
   // const toggleFavourite = useToggleFileFavourite();
   const restoreFile = useRestoreFile();
   const permanentDeleteFile = usePermanentDeleteFile();
@@ -769,6 +772,13 @@ const FileList: React.FC<FileListProps> = ({
     }
   };
 
+  const handleRename = (fileId: number, currentName: string) => {
+    const newName = window.prompt("Enter new file name:", currentName);
+    if (newName && newName.trim() !== "" && newName !== currentName) {
+      updateFile.mutate({ id: fileId, name: newName });
+    }
+  };
+
   const handleDelete = (fileId: number, fileName: string) => {
     if (window.confirm(`Are you sure you want to delete "${fileName}"?`)) {
       deleteFile.mutate(fileId);
@@ -924,6 +934,20 @@ const FileList: React.FC<FileListProps> = ({
                 </div>
 
                 <div className="flex items-center space-x-2">
+                  {/* Move button (left of Open in new window) */}
+                  {!isTrashView && (userRole === "super_admin" || file.created_by === userId) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRename(file.id, file.name);
+                      }}
+                      className="p-2 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-colors"
+                      title="Rename File"
+                    >
+                      <FiEdit3 size={18} />
+                    </button>
+                  )}
+
                   {/* Move button (left of Open in new window) */}
                   {canView && !isTrashView && userRole === "super_admin" && (
                     <button
