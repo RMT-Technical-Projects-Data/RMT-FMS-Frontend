@@ -1,7 +1,6 @@
-
 import React, { useState } from "react";
 import ReactDOM from "react-dom";
-import { FiFolder, FiX, FiChevronRight, FiChevronDown, FiCheck } from "react-icons/fi";
+import { FiFolder, FiX, FiChevronRight, FiChevronDown, FiCheck, FiAlertCircle } from "react-icons/fi";
 import { useFolderTree } from "../hooks/useFolders";
 import { useMoveFile } from "../hooks/useFiles";
 import type { Folder } from "../types";
@@ -83,8 +82,17 @@ const MoveFileModal: React.FC<MoveFileModalProps> = ({
     const { data: folderTree, isLoading } = useFolderTree();
     const moveFile = useMoveFile();
     const [selectedFolderIds, setSelectedFolderIds] = useState<number[]>([]);
+    const [error, setError] = useState<string | null>(null);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            setSelectedFolderIds([]);
+            setError(null);
+        }
+    }, [isOpen]);
 
     const handleToggleFolder = (folderId: number) => {
+        setError(null); // Clear error on interaction
         setSelectedFolderIds((prev) => {
             if (prev.includes(folderId)) {
                 return prev.filter((id) => id !== folderId);
@@ -96,19 +104,22 @@ const MoveFileModal: React.FC<MoveFileModalProps> = ({
 
     const handleSubmit = () => {
         if (fileId && selectedFolderIds.length > 0) {
+            setError(null);
             moveFile.mutate(
                 { fileId, targetFolderIds: selectedFolderIds },
                 {
                     onSuccess: () => {
                         setSelectedFolderIds([]);
+                        setError(null);
                         onClose();
                     },
+                    onError: (err: any) => {
+                        setError(err.response?.data?.message || "Failed to move file");
+                    }
                 }
             );
         }
     };
-
-    if (!isOpen) return null;
 
     if (!isOpen) return null;
 
@@ -153,31 +164,41 @@ const MoveFileModal: React.FC<MoveFileModalProps> = ({
                     )}
                 </div>
 
-                <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex justify-between items-center">
-                    <div className="text-sm text-gray-500">
-                        {selectedFolderIds.length} folder{selectedFolderIds.length !== 1 ? "s" : ""} selected
-                    </div>
-                    <div className="flex space-x-3">
-                        <button
-                            onClick={onClose}
-                            className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-white transition-all font-medium shadow-sm"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={selectedFolderIds.length === 0 || moveFile.isPending}
-                            className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all font-medium shadow-lg shadow-blue-500/20 flex items-center"
-                        >
-                            {moveFile.isPending ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                                    Moving...
-                                </>
-                            ) : (
-                                "Move File"
-                            )}
-                        </button>
+                <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex flex-col space-y-4">
+                    {/* Error Message Display */}
+                    {error && (
+                        <div className="flex items-center p-3 text-sm text-red-700 bg-red-50 rounded-lg border border-red-200">
+                            <FiAlertCircle className="flex-shrink-0 mr-2" size={16} />
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-center w-full">
+                        <div className="text-sm text-gray-500">
+                            {selectedFolderIds.length} folder{selectedFolderIds.length !== 1 ? "s" : ""} selected
+                        </div>
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={onClose}
+                                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-white transition-all font-medium shadow-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={selectedFolderIds.length === 0 || moveFile.isPending}
+                                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all font-medium shadow-lg shadow-blue-500/20 flex items-center"
+                            >
+                                {moveFile.isPending ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                                        Moving...
+                                    </>
+                                ) : (
+                                    "Move File"
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

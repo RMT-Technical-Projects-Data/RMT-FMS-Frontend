@@ -717,9 +717,6 @@ export const useMoveFile = () => {
       queryClient.invalidateQueries({ queryKey: ["rootFolders"] });
       toast.success("File moved successfully!");
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to move file");
-    },
   });
 };
 export const useBulkPermanentDeleteFiles = () => {
