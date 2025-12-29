@@ -533,6 +533,7 @@
 
 // components/FileList.tsx
 import React from "react";
+import { toast } from "react-toastify";
 import { API_BASE_URL } from "../config";
 import type { File } from "../types";
 import {
@@ -750,6 +751,12 @@ const FileList: React.FC<FileListProps> = ({
   };
 
   const handleOpenFile = async (file: File) => {
+    // Check for unsupported formats
+    if (/\.(docx|xlsx)$/i.test(file.name)) {
+      toast.error("format/extension not supported by browser");
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token") || "";
 
