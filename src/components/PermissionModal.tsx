@@ -594,7 +594,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
   const notify = (message: string, type: "success" | "error" | "info" | "warning") => {
     toast.dismiss();
     if (showToast) {
-      try { showToast(message, type); } catch {}
+      try { showToast(message, type); } catch { }
     }
     if (type === "success") toast.success(message, { autoClose: TOAST_DURATION_MS });
     else if (type === "error") toast.error(message, { autoClose: TOAST_DURATION_MS });
@@ -707,6 +707,12 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
 
   const hasPermissionsChanged = selectedUsersChanged || permissionsChanged;
 
+  const hasNewSelectedUsers = useMemo(() => {
+    if (!originalSelectedUsers) return selectedUsers.length > 0;
+    const orig = new Set(originalSelectedUsers);
+    return selectedUsers.some((id) => !orig.has(id));
+  }, [selectedUsers, originalSelectedUsers]);
+
   // Toggle user selection — only allowed ids from availableUserIdSet
   const toggleUser = (userIdRaw: number | string) => {
     const userId = Number(userIdRaw);
@@ -761,10 +767,10 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
       (removePermission as any).mutateAsyncByUser
         ? (removePermission as any).mutateAsyncByUser({ user_id, resource_id: resourceId, resource_type: resourceType })
         : (async () => {
-            const permObj = (resourcePermissions as any[])?.find((p) => Number((p as any).user_id ?? (p as any).userId) === user_id);
-            if (permObj && permObj.id) return (removePermission as any).mutateAsync(permObj.id);
-            return (assignPermission as any).mutateAsync({ user_id, resource_id: resourceId, resource_type: resourceType, can_read: false, can_download: false });
-          })()
+          const permObj = (resourcePermissions as any[])?.find((p) => Number((p as any).user_id ?? (p as any).userId) === user_id);
+          if (permObj && permObj.id) return (removePermission as any).mutateAsync(permObj.id);
+          return (assignPermission as any).mutateAsync({ user_id, resource_id: resourceId, resource_type: resourceType, can_read: false, can_download: false });
+        })()
     );
 
     try {
@@ -905,7 +911,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
               <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
               <button
                 onClick={handleSubmit}
-                disabled={!hasPermissionsChanged || isAssigning}
+                disabled={!hasPermissionsChanged || isAssigning || (hasNewSelectedUsers && !permissions.can_read)}
                 className="px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isAssigning ? (
