@@ -630,6 +630,7 @@ const TrashView: React.FC<TrashViewProps> = ({
                       onClick={() => handleFolderClick(folder)}
                       className={`flex items-center p-4 bg-gray-50 rounded-xl border transition-all cursor-pointer group relative opacity-75
                         ${isSelected ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-gray-200 hover:shadow-md'}
+                        ${openDropdownId === folder.id ? 'z-20' : ''}
                       `}
                     >
                       {/* Checkbox for Folder */}
