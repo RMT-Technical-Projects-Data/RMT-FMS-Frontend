@@ -12,5 +12,5 @@
 // Dynamic Configuration (Default)
 export const API_BASE_URL =
     window.location.hostname === "localhost"
-        ? "http://localhost:3000/api"
+        ? "http://localhost:3100/api"
         : "https://rmtfms.duckdns.org/api";
