@@ -73,49 +73,100 @@ const uploadFile = async (data: FormData): Promise<File> => {
   }
 };
 
-const uploadFolder = async (data: FormData): Promise<{ files: File[] }> => {
-  console.log("🚀 Starting folder upload...");
-
-  // Debug: Log FormData contents
-  console.log("📋 FormData contents for folder:");
-  for (let [key, value] of data.entries()) {
-    if (value instanceof File) {
-      console.log(`  ${key}: File - ${value.name} (${value.size} bytes)`);
-      console.log(
-        `    - webkitRelativePath: ${(value as any).webkitRelativePath || "NOT SET"
-        }`
-      );
-    } else {
-      console.log(`  ${key}: ${value}`);
-    }
+// Helper to split array into chunks
+const chunkArray = <T>(array: T[], size: number): T[][] => {
+  const result: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
   }
+  return result;
+};
+
+interface UploadFolderParams {
+  files: globalThis.File[];
+  paths: string[];
+  folderId: number | null;
+  allPaths: string[];
+}
+
+const uploadFolder = async ({
+  files,
+  paths,
+  folderId,
+  allPaths,
+}: UploadFolderParams): Promise<{ files: File[] }> => {
+  console.log("🚀 Starting batched folder upload...");
+  console.log(`TOTAL FILES: ${files.length}`);
+
+  const BATCH_SIZE = 50; // Adjust based on server limits
+  const fileChunks = chunkArray(files, BATCH_SIZE);
+  const pathChunks = chunkArray(paths, BATCH_SIZE);
+
+  const accumulatedFiles: File[] = [];
 
   try {
     const token = localStorage.getItem("token");
-    if (!token) {
-      throw new Error("No authentication token found");
+    if (!token) throw new Error("No authentication token found");
+
+    for (let i = 0; i < fileChunks.length; i++) {
+      console.log(`🚀 Uploading Batch ${i + 1} of ${fileChunks.length}...`);
+
+      const formData = new FormData();
+
+      // Append files and their corresponding paths for this batch
+      fileChunks[i].forEach((file, index) => {
+        // Cast to any to avoid conflict with custom File type
+        formData.append("files", file as any);
+        formData.append("paths", pathChunks[i][index]);
+      });
+
+      // Append folderId if it exists
+      if (folderId !== null) {
+        formData.append("folderId", folderId.toString());
+      }
+
+      // ONLY append allPaths for the FIRST batch to create the structure
+      // or if the backend logic is idempotent and efficient, we could send it every time,
+      // but sending it once is cleaner if the backend handles incremental adds.
+      // Based on user request "if Folder A is created in Batch 1, Batch 2 will find it",
+      // it implies we should ensure structure exists. 
+      // Safe bet: Send it on the first batch.
+      if (i === 0 && allPaths.length > 0) {
+        formData.append("allPaths", JSON.stringify(allPaths));
+      } else {
+        // Send empty array for subsequent batches to avoid re-creation overhead if backend checks it
+        formData.append("allPaths", JSON.stringify([]));
+      }
+
+      const response = await axios.post(
+        `${API_BASE_URL}/files/upload-folder`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+          timeout: 300000, // 5 minute timeout per batch
+          onUploadProgress: (progressEvent) => {
+            // Calculate progress relative to the WHOLE upload? 
+            // Or just log batch progress. Simple logging for now.
+            const progress = progressEvent.total
+              ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
+              : 0;
+            console.log(`[Batch ${i + 1}] 📤 Upload Progress: ${progress}%`);
+          },
+        }
+      );
+
+      console.log(`✅ Batch ${i + 1} success:`, response.data);
+      if (response.data.files) {
+        accumulatedFiles.push(...response.data.files);
+      }
     }
 
-    const response = await axios.post(
-      `${API_BASE_URL}/files/upload-folder`,
-      data,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-        timeout: 300000, // 5 minute timeout for folders
-        onUploadProgress: (progressEvent) => {
-          const progress = progressEvent.total
-            ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
-            : 0;
-          console.log(`📤 Upload Progress: ${progress}%`);
-        },
-      }
-    );
+    console.log("✅ All batches uploaded successfully!");
+    return { files: accumulatedFiles };
 
-    console.log("✅ Folder upload successful:", response.data);
-    return response.data as { files: File[] };
   } catch (error: any) {
     console.error("❌ Folder upload failed:", error);
     if (error.response) {

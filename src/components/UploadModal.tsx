@@ -137,13 +137,14 @@ const UploadModal: React.FC<UploadModalProps> = ({
       if (hasWebkitRelativePath) {
         // Full folder structure with webkitRelativePath (file picker)
         const folderSet = new Set<string>();
-        // const relativePaths: string[] = [];
+        const filesArray: File[] = [];
+        const pathsArray: string[] = [];
 
         // 1. Collect and append files/paths
         for (const file of Array.from(files)) {
           const relPath = (file as any).webkitRelativePath;
-          formData.append("files", file);
-          formData.append("paths", relPath);
+          filesArray.push(file);
+          pathsArray.push(relPath);
 
           // Collect folder paths for empty folder creation
           const pathParts = relPath.split("/");
@@ -155,8 +156,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
           }
         }
 
-        // Send unique folder paths (includes empty ones)
-        formData.append("allPaths", JSON.stringify([...folderSet]));
+        const allPaths = [...folderSet];
 
         // Check for duplicate top-level folders
         const topLevelFolders = new Set<string>();
@@ -177,29 +177,57 @@ const UploadModal: React.FC<UploadModalProps> = ({
             return; // Stop upload
           }
         }
+
+        // Use the React Query mutation for folder upload with batched params
+        uploadFolderMutation.mutate(
+          {
+            files: filesArray,
+            paths: pathsArray,
+            folderId,
+            allPaths,
+          },
+          {
+            onSuccess: () => {
+              alert("Folder uploaded successfully!");
+              onClose(); // Close modal after successful upload
+            },
+            onError: (error: any) => {
+              console.error("Folder upload error:", error);
+              alert(error.message || "Upload failed");
+            },
+          }
+        );
       } else {
         // Drag & drop folder upload - legacy simple structure
         // Note: For drag-drop, file.webkitRelativePath is usually empty or specific. 
         // We stick to simple logic here but ensure ID is already added.
-        formData.append("allPaths", JSON.stringify([]));
+
+        const filesArray: File[] = [];
+        const pathsArray: string[] = [];
 
         for (const file of Array.from(files)) {
-          formData.append("files", file);
-          formData.append("paths", file.name); // Legacy path usage
+          filesArray.push(file);
+          pathsArray.push(file.name); // Legacy path usage
         }
-      }
 
-      // Use the React Query mutation for folder upload
-      uploadFolderMutation.mutate(formData, {
-        onSuccess: () => {
-          alert("Folder uploaded successfully!");
-          onClose(); // Close modal after successful upload
-        },
-        onError: (error: any) => {
-          console.error("Folder upload error:", error);
-          alert(error.message || "Upload failed");
-        },
-      });
+        uploadFolderMutation.mutate(
+          {
+            files: filesArray,
+            paths: pathsArray,
+            folderId,
+            allPaths: [],
+          },
+          {
+            onSuccess: () => {
+              alert("Folder uploaded successfully!");
+              onClose(); // Close modal after successful upload
+            },
+            onError: (error: any) => {
+              console.error("Folder upload error:", error);
+              alert(error.message || "Upload failed");
+            },
+          });
+      }
     } else {
       // Handle single file uploads
       for (const file of Array.from(files)) {
