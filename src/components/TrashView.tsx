@@ -359,6 +359,8 @@ import {
   FiClock,
 } from "react-icons/fi";
 import FileList from "./FileList";
+import ConfirmModal from "./ConfirmModal";
+import { toast } from "react-toastify";
 import { useTrashFilesByFolder, useBulkPermanentDeleteFiles } from "../hooks/useFiles";
 import { useTrashFoldersByParent, useRestoreFolder, usePermanentDeleteFolder } from "../hooks/useFolders";
 // import { useUserPermissions } from "../hooks/usePermissions";
@@ -393,6 +395,12 @@ const TrashView: React.FC<TrashViewProps> = ({
   // State for Selection
   const [selectedFileIds, setSelectedFileIds] = React.useState<number[]>([]);
   const [selectedFolderIds, setSelectedFolderIds] = React.useState<number[]>([]);
+  const [confirmState, setConfirmState] = React.useState<{
+    type: "restoreFolder" | "deleteFolder" | "bulkDelete";
+    id?: number;
+    name?: string;
+    total?: number;
+  } | null>(null);
 
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -432,28 +440,12 @@ const TrashView: React.FC<TrashViewProps> = ({
   };
 
   const handleRestoreFolder = (folderId: number, folderName: string) => {
-    if (window.confirm(`Are you sure you want to restore "${folderName}"?`)) {
-      restoreFolder.mutate(folderId, {
-        onSuccess: () => {
-          console.log("✅ Folder restored successfully");
-        },
-      });
-    }
+    setConfirmState({ type: "restoreFolder", id: folderId, name: folderName });
     setOpenDropdownId(null);
   };
 
   const handlePermanentDeleteFolder = (folderId: number, folderName: string) => {
-    if (window.confirm(`Are you sure you want to permanently delete "${folderName}"? This action cannot be undone.`)) {
-      permanentDeleteFolder.mutate(folderId, {
-        onSuccess: () => {
-          console.log("✅ Folder permanently deleted");
-        },
-        onError: (error: any) => {
-          console.error("❌ Failed to permanently delete folder:", error);
-          alert("Failed to permanently delete folder. Please try again.");
-        },
-      });
-    }
+    setConfirmState({ type: "deleteFolder", id: folderId, name: folderName });
     setOpenDropdownId(null);
   };
 
@@ -493,36 +485,63 @@ const TrashView: React.FC<TrashViewProps> = ({
   };
 
   // 4. Delete All Selected Items
+  const runBulkDelete = () => {
+    // Delete Files (Bulk)
+    if (selectedFileIds.length > 0) {
+      bulkPermanentDeleteFiles.mutate(selectedFileIds, {
+        onSuccess: () => {
+          setSelectedFileIds([]);
+          console.log("✅ Bulk file delete successful");
+        },
+        onError: (error: any) => {
+          console.error("❌ Bulk file delete failed:", error);
+          toast.error("Bulk file delete failed");
+        },
+      });
+    }
+
+    // Delete Folders (Iterative - since we don't have a bulk folder hook yet)
+    if (selectedFolderIds.length > 0) {
+      selectedFolderIds.forEach((id) => {
+        permanentDeleteFolder.mutate(id, {
+          onError: (error: any) => {
+            console.error(`❌ Failed to delete folder ${id}`, error);
+            toast.error("Failed to delete folder");
+          },
+        });
+      });
+      setSelectedFolderIds([]);
+    }
+  };
+
   const handleDeleteSelectedItems = () => {
     const totalSelected = selectedFileIds.length + selectedFolderIds.length;
     if (totalSelected === 0) return;
+    setConfirmState({ type: "bulkDelete", total: totalSelected });
+  };
 
-    const confirmMessage = `Are you sure you want to permanently delete these ${totalSelected} items? This action cannot be undone and will delete all contents inside selected folders.`;
+  const handleConfirmTrashAction = () => {
+    if (!confirmState) return;
 
-    if (window.confirm(confirmMessage)) {
+    if (confirmState.type === "restoreFolder" && confirmState.id != null) {
+      restoreFolder.mutate(confirmState.id, {
+        onSettled: () => setConfirmState(null),
+      });
+      return;
+    }
 
-      // Delete Files (Bulk)
-      if (selectedFileIds.length > 0) {
-        bulkPermanentDeleteFiles.mutate(selectedFileIds, {
-          onSuccess: () => {
-            setSelectedFileIds([]);
-            console.log("✅ Bulk file delete successful");
-          },
-          onError: (error: any) => {
-            console.error("❌ Bulk file delete failed:", error);
-          }
-        });
-      }
+    if (confirmState.type === "deleteFolder" && confirmState.id != null) {
+      permanentDeleteFolder.mutate(confirmState.id, {
+        onError: () =>
+          toast.error("Failed to permanently delete folder. Please try again."),
+        onSettled: () => setConfirmState(null),
+      });
+      return;
+    }
 
-      // Delete Folders (Iterative - since we don't have a bulk folder hook yet)
-      if (selectedFolderIds.length > 0) {
-        selectedFolderIds.forEach(id => {
-          permanentDeleteFolder.mutate(id, {
-            onError: (error: any) => console.error(`❌ Failed to delete folder ${id}`, error)
-          });
-        });
-        setSelectedFolderIds([]);
-      }
+    if (confirmState.type === "bulkDelete") {
+      runBulkDelete();
+      setConfirmState(null);
     }
   };
 
@@ -548,6 +567,7 @@ const TrashView: React.FC<TrashViewProps> = ({
   const isLoading = filesLoading || foldersLoading;
 
   return (
+    <>
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 p-6">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center space-x-4">
@@ -740,6 +760,47 @@ const TrashView: React.FC<TrashViewProps> = ({
         </div>
       )}
     </div>
+
+    <ConfirmModal
+      isOpen={!!confirmState}
+      title={
+        confirmState?.type === "restoreFolder"
+          ? "Restore Folder"
+          : confirmState?.type === "deleteFolder"
+          ? "Delete Folder Forever"
+          : "Delete Selected Items"
+      }
+      message={
+        confirmState?.type === "restoreFolder" ? (
+          <>
+            Restore folder <strong>"{confirmState.name}"</strong>?
+          </>
+        ) : confirmState?.type === "deleteFolder" ? (
+          <>
+            Permanently delete folder <strong>"{confirmState.name}"</strong>?
+            This cannot be undone.
+          </>
+        ) : (
+          <>
+            Permanently delete these{" "}
+            <strong>{confirmState?.total || 0}</strong> items? This cannot be
+            undone and will delete all contents inside selected folders.
+          </>
+        )
+      }
+      confirmLabel={
+        confirmState?.type === "restoreFolder" ? "Restore" : "Delete Forever"
+      }
+      tone={confirmState?.type === "restoreFolder" ? "primary" : "danger"}
+      isLoading={
+        restoreFolder.isPending ||
+        permanentDeleteFolder.isPending ||
+        bulkPermanentDeleteFiles.isPending
+      }
+      onClose={() => setConfirmState(null)}
+      onConfirm={handleConfirmTrashAction}
+    />
+    </>
   );
 };
 

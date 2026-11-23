@@ -34,6 +34,7 @@ export interface File {
   deleted_at?: string | null;
   is_archived?: boolean;
   archived_at?: string | null;
+  has_master_stamp?: boolean;
   folder_name?: string; // For joined queries
 }
 

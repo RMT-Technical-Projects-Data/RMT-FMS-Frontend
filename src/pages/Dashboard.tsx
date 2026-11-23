@@ -430,6 +430,9 @@ const Dashboard: React.FC = () => {
             ) : activeView === "archive" ? (
               <ArchiveView
                 user={user}
+                selectedFolderId={selectedFolderId}
+                onFolderSelect={handleFolderSelect}
+                onBackNavigation={handleBackNavigation}
                 onAssignPermission={(resourceId, resourceType) => {
                   setPermissionResource({ id: resourceId, type: resourceType });
                   setIsPermissionModalOpen(true);

@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Dialog } from "@headlessui/react";
-import { useUploadFile, useUploadFolder } from "../hooks/useFiles";
+import {
+  useUploadFile,
+  useUploadFolder,
+  setMasterStampPreference,
+} from "../hooks/useFiles";
 import { FiUpload, FiX, FiFile, FiFolder, FiCloud } from "react-icons/fi";
 import { toast } from "react-toastify";
 
@@ -11,6 +15,18 @@ interface UploadModalProps {
   existingFolderNames?: string[];
 }
 
+const extractUploadedIds = (data: any): number[] => {
+  if (!data) return [];
+  if (Array.isArray(data.files)) {
+    return data.files.map((f: any) => f.id).filter((id: any) => !!id);
+  }
+  if (Array.isArray(data)) {
+    return data.map((f: any) => f.id).filter((id: any) => !!id);
+  }
+  if (data.id) return [data.id];
+  return [];
+};
+
 const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
@@ -20,6 +36,9 @@ const UploadModal: React.FC<UploadModalProps> = ({
   const [uploadType, setUploadType] = useState<"file" | "folder">("file");
   const [files, setFiles] = useState<FileList | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [step, setStep] = useState<"upload" | "stamp">("upload");
+  const [uploadedIds, setUploadedIds] = useState<number[]>([]);
+  const [savingStamp, setSavingStamp] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadFileMutation = useUploadFile();
@@ -31,9 +50,32 @@ const UploadModal: React.FC<UploadModalProps> = ({
       setFiles(null);
       setUploadType("file");
       setIsDragging(false);
+      setStep("upload");
+      setUploadedIds([]);
+      setSavingStamp(false);
       if (fileInputRef.current) fileInputRef.current.value = ""; // reset input
     }
   }, [isOpen]);
+
+  const finishWithStampChoice = async (withStamp: boolean) => {
+    try {
+      setSavingStamp(true);
+      if (uploadedIds.length > 0) {
+        await setMasterStampPreference(uploadedIds, withStamp);
+      }
+      toast.success(
+        withStamp
+          ? "Upload complete — Master Copy stamp enabled"
+          : "Upload complete — without Master Copy stamp"
+      );
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.response?.data?.error || "Failed to save stamp preference");
+    } finally {
+      setSavingStamp(false);
+    }
+  };
 
   // ✅ Reset files when switching between upload types
   const handleUploadTypeChange = (type: "file" | "folder") => {
@@ -108,8 +150,9 @@ const UploadModal: React.FC<UploadModalProps> = ({
     e.preventDefault();
 
     if (!files || files.length === 0) {
-      alert(
-        `Please select ${uploadType === "folder" ? "a folder" : "file(s)"
+      toast.error(
+        `Please select ${
+          uploadType === "folder" ? "a folder" : "file(s)"
         } to upload.`
       );
       return;
@@ -187,13 +230,13 @@ const UploadModal: React.FC<UploadModalProps> = ({
             allPaths,
           },
           {
-            onSuccess: () => {
-              alert("Folder uploaded successfully!");
-              onClose(); // Close modal after successful upload
+            onSuccess: (data) => {
+              setUploadedIds(extractUploadedIds(data));
+              setStep("stamp");
             },
             onError: (error: any) => {
               console.error("Folder upload error:", error);
-              alert(error.message || "Upload failed");
+              toast.error(error.message || "Upload failed");
             },
           }
         );
@@ -218,13 +261,13 @@ const UploadModal: React.FC<UploadModalProps> = ({
             allPaths: [],
           },
           {
-            onSuccess: () => {
-              alert("Folder uploaded successfully!");
-              onClose(); // Close modal after successful upload
+            onSuccess: (data) => {
+              setUploadedIds(extractUploadedIds(data));
+              setStep("stamp");
             },
             onError: (error: any) => {
               console.error("Folder upload error:", error);
-              alert(error.message || "Upload failed");
+              toast.error(error.message || "Upload failed");
             },
           });
       }
@@ -235,13 +278,13 @@ const UploadModal: React.FC<UploadModalProps> = ({
       }
 
       uploadFileMutation.mutate(formData, {
-        onSuccess: () => {
-          // alert("File uploaded successfully!");
-          onClose(); // Close modal after successful upload
+        onSuccess: (data) => {
+          setUploadedIds(extractUploadedIds(data));
+          setStep("stamp");
         },
         onError: (error: any) => {
           console.error("File upload error:", error);
-          alert(error.message || "Upload failed");
+          toast.error(error.message || "Upload failed");
         },
       });
     }
@@ -252,11 +295,11 @@ const UploadModal: React.FC<UploadModalProps> = ({
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 bg-transparent backdrop-blur-md"
         aria-hidden="true"
       />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-white rounded-2xl shadow-2xl max-w-md w-full transform transition-all">
+      <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
+        <Dialog.Panel className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full max-h-[min(90vh,720px)] overflow-y-auto my-auto transform transition-all">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-100">
             <div className="flex items-center space-x-3">
@@ -265,10 +308,14 @@ const UploadModal: React.FC<UploadModalProps> = ({
               </div>
               <div>
                 <Dialog.Title className="text-xl font-bold text-gray-900">
-                  Upload {uploadType === "file" ? "File(s)" : "Folder"}
+                  {step === "stamp"
+                    ? "Stamp Preference"
+                    : `Upload ${uploadType === "file" ? "File(s)" : "Folder"}`}
                 </Dialog.Title>
                 <p className="text-sm text-gray-500">
-                  Add new content to your storage
+                  {step === "stamp"
+                    ? "Apply Master Copy stamp to uploaded PDF(s)?"
+                    : "Add new content to your storage"}
                 </p>
               </div>
             </div>
@@ -280,6 +327,38 @@ const UploadModal: React.FC<UploadModalProps> = ({
             </button>
           </div>
 
+          {step === "stamp" ? (
+            <>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-600">
+                  Upload finished. Choose whether these documents should show a
+                  green <strong>Master Copy</strong> tag on the first page.
+                </p>
+                <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                  With stamp → green “Master Copy” box on the top-right of page 1.
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
+                <button
+                  type="button"
+                  disabled={savingStamp}
+                  onClick={() => finishWithStampChoice(false)}
+                  className="px-5 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-50"
+                >
+                  Without Stamp
+                </button>
+                <button
+                  type="button"
+                  disabled={savingStamp}
+                  onClick={() => finishWithStampChoice(true)}
+                  className="px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-medium disabled:opacity-50"
+                >
+                  {savingStamp ? "Saving…" : "With Stamp"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
           {/* Content */}
           <div className="p-6 space-y-6">
             {/* Upload Type */}
@@ -406,6 +485,8 @@ const UploadModal: React.FC<UploadModalProps> = ({
               )}
             </button>
           </div>
+            </>
+          )}
         </Dialog.Panel>
       </div>
     </Dialog>

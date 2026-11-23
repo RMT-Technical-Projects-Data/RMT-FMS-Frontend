@@ -345,18 +345,18 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
       />
 
       <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white rounded-2xl shadow-2xl transform transition-all flex flex-col max-w-sm w-full max-h-[80vh]">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
-              <div className="flex items-center space-x-2">
-                <div className="p-1.5 bg-purple-100 rounded-lg"><FiKey className="text-purple-600" size={16} /></div>
+        <div className="fixed inset-0 bg-transparent backdrop-blur-md" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
+          <Dialog.Panel className="bg-white rounded-2xl shadow-2xl border border-gray-100 transform transition-all flex flex-col w-full max-w-2xl h-[min(640px,90vh)] max-h-[90vh] my-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg"><FiKey className="text-purple-600" size={18} /></div>
                 <div>
-                  <Dialog.Title className="text-lg font-bold text-gray-900">Assign Permissions</Dialog.Title>
-                  <p className="text-xs text-gray-500">Set permissions for {resourceType}</p>
+                  <Dialog.Title className="text-xl font-bold text-gray-900">Assign Permissions</Dialog.Title>
+                  <p className="text-sm text-gray-500">Set permissions for this {resourceType}</p>
                 </div>
               </div>
-              <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><FiX size={16} /></button>
+              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><FiX size={18} /></button>
             </div>
 
             {/* Tabs */}
@@ -399,36 +399,32 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
               </button>
             </div>
 
-            <div className="p-4 space-y-4 overflow-y-auto flex-1">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">Select User</label>
-                <div className="relative">
-                  <div className="mt-1">
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 max-h-64 overflow-auto">
-                      <div className="p-2 space-y-1">
-                        {usersDisplay.map((u) => {
-                          const idNum = Number((u as any).id);
-                          const checked = selectedUsers.includes(idNum);
-                          return (
-                            <label key={idNum} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer">
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleUser(idNum)}
-                                  className="mt-0.5 text-purple-600 focus:ring-purple-500 rounded"
-                                />
-                                <div className="text-sm">
-                                  <div className="font-medium text-gray-900">{(u as any).username ?? (u as any).name ?? `User ${idNum}`}</div>
-                                  <div className="text-xs text-gray-500">{(u as any).role ?? "user"}</div>
-                                </div>
-                              </div>
-                            </label>
-                          );
-                        })}
-                        {usersDisplay.length === 0 && <div className="text-xs text-gray-500 p-2 text-center">No users in this category</div>}
-                      </div>
-                    </div>
+            <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+              <div className="flex flex-col h-full min-h-0">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select User</label>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 min-h-[220px] max-h-[320px] overflow-auto">
+                  <div className="p-2 space-y-1">
+                    {usersDisplay.map((u) => {
+                      const idNum = Number((u as any).id);
+                      const checked = selectedUsers.includes(idNum);
+                      return (
+                        <label key={idNum} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <div className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleUser(idNum)}
+                              className="mt-0.5 text-purple-600 focus:ring-purple-500 rounded"
+                            />
+                            <div className="text-sm">
+                              <div className="font-medium text-gray-900">{(u as any).username ?? (u as any).name ?? `User ${idNum}`}</div>
+                              <div className="text-xs text-gray-500">{(u as any).role ?? "user"}</div>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                    {usersDisplay.length === 0 && <div className="text-sm text-gray-500 p-4 text-center">No users in this category</div>}
                   </div>
                 </div>
               </div>
@@ -469,12 +465,12 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
               )}
             </div>
 
-            <div className="flex justify-end space-x-2 p-4 border-t border-gray-100 flex-shrink-0">
-              <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
+            <div className="flex justify-end space-x-3 p-5 border-t border-gray-100 flex-shrink-0">
+              <button onClick={onClose} className="px-5 py-2.5 text-sm border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">Cancel</button>
               <button
                 onClick={handleSubmit}
                 disabled={!hasPermissionsChanged || isAssigning || (hasNewSelectedUsers && !permissions.can_read)}
-                className="px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 text-sm bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isAssigning ? (
                   <div className="flex items-center space-x-1.5">

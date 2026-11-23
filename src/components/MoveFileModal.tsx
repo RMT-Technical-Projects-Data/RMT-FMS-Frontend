@@ -124,8 +124,14 @@ const MoveFileModal: React.FC<MoveFileModalProps> = ({
     if (!isOpen) return null;
 
     return ReactDOM.createPortal(
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[80vh]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+            <button
+                type="button"
+                className="fixed inset-0 bg-transparent backdrop-blur-md cursor-default"
+                aria-label="Close dialog"
+                onClick={onClose}
+            />
+            <div className="relative my-auto bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-lg flex flex-col max-h-[min(90vh,720px)]">
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900">Move File</h2>

@@ -565,6 +565,15 @@ import {
   FiEdit3,
 } from "react-icons/fi";
 import MoveFileModal from "./MoveFileModal";
+import ConfirmModal, { type ConfirmTone } from "./ConfirmModal";
+import PromptModal from "./PromptModal";
+
+type FileConfirmAction =
+  | "delete"
+  | "archive"
+  | "unarchive"
+  | "restore"
+  | "permanentDelete";
 
 interface FileListProps {
   files: File[];
@@ -606,6 +615,20 @@ const FileList: React.FC<FileListProps> = ({
   const [selectedFileForMove, setSelectedFileForMove] = React.useState<{
     id: number;
     name: string;
+  } | null>(null);
+
+  const [renameTarget, setRenameTarget] = React.useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [dateEditTarget, setDateEditTarget] = React.useState<{
+    id: number;
+    date: string;
+  } | null>(null);
+  const [confirmTarget, setConfirmTarget] = React.useState<{
+    id: number;
+    name: string;
+    action: FileConfirmAction;
   } | null>(null);
 
   // Super Admin discreet upload-date edit (5 rapid clicks on the date)
@@ -803,15 +826,12 @@ const FileList: React.FC<FileListProps> = ({
       window.open(fileUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
       console.error("❌ Error opening file:", err);
-      alert("Failed to open file. Please try again.");
+      toast.error("Failed to open file. Please try again.");
     }
   };
 
   const handleRename = (fileId: number, currentName: string) => {
-    const newName = window.prompt("Enter new file name:", currentName);
-    if (newName && newName.trim() !== "" && newName !== currentName) {
-      updateFile.mutate({ id: fileId, name: newName });
-    }
+    setRenameTarget({ id: fileId, name: currentName });
   };
 
   /**
@@ -838,17 +858,7 @@ const FileList: React.FC<FileListProps> = ({
       const current = file.created_at
         ? new Date(file.created_at).toISOString().slice(0, 10)
         : "";
-      const next = window.prompt(
-        "Update document upload date (YYYY-MM-DD):",
-        current
-      );
-      if (!next) return;
-      const parsed = new Date(next);
-      if (Number.isNaN(parsed.getTime())) {
-        toast.error("Invalid date format");
-        return;
-      }
-      updateFile.mutate({ id: file.id, created_at: parsed.toISOString() });
+      setDateEditTarget({ id: file.id, date: current });
       return;
     }
 
@@ -859,57 +869,116 @@ const FileList: React.FC<FileListProps> = ({
   };
 
   const handleArchive = (fileId: number, fileName: string) => {
-    if (
-      window.confirm(
-        `Move "${fileName}" to archive? Opening it will show an OBSOLETE stamp.`
-      )
-    ) {
-      archiveFileMutation.mutate(fileId);
-    }
+    setConfirmTarget({ id: fileId, name: fileName, action: "archive" });
   };
 
   const handleUnarchive = (fileId: number, fileName: string) => {
-    if (window.confirm(`Restore "${fileName}" from archive?`)) {
-      unarchiveFileMutation.mutate(fileId);
-    }
+    setConfirmTarget({ id: fileId, name: fileName, action: "unarchive" });
   };
 
   const handleDelete = (fileId: number, fileName: string) => {
-    if (window.confirm(`Are you sure you want to delete "${fileName}"?`)) {
-      deleteFile.mutate(fileId);
-    }
+    setConfirmTarget({ id: fileId, name: fileName, action: "delete" });
   };
 
   const handleRestore = (fileId: number, fileName: string) => {
-    if (window.confirm(`Are you sure you want to restore "${fileName}"?`)) {
-      restoreFile.mutate(fileId, {
-        onSuccess: () => {
-          console.log("✅ File restored successfully");
-        },
-        onError: (error: any) => {
-          console.error("❌ Failed to restore file:", error);
-          alert("Failed to restore file. Please try again.");
-        },
-      });
-    }
+    setConfirmTarget({ id: fileId, name: fileName, action: "restore" });
   };
 
   const handlePermanentDelete = (fileId: number, fileName: string) => {
-    if (
-      window.confirm(
-        `Are you sure you want to permanently delete "${fileName}"? This action cannot be undone.`
-      )
-    ) {
-      permanentDeleteFile.mutate(fileId, {
-        onSuccess: () => {
-          console.log("✅ File permanently deleted");
-        },
-        onError: (error: any) => {
-          console.error("❌ Failed to permanently delete file:", error);
-          alert("Failed to permanently delete file. Please try again.");
-        },
-      });
+    setConfirmTarget({
+      id: fileId,
+      name: fileName,
+      action: "permanentDelete",
+    });
+  };
+
+  const confirmActionMeta: Record<
+    FileConfirmAction,
+    { title: string; confirmLabel: string; tone: ConfirmTone; message: (name: string) => React.ReactNode }
+  > = {
+    delete: {
+      title: "Move to Trash",
+      confirmLabel: "Delete",
+      tone: "danger",
+      message: (name) => (
+        <>
+          Move <strong>"{name}"</strong> to trash?
+        </>
+      ),
+    },
+    archive: {
+      title: "Move to Archive",
+      confirmLabel: "Archive",
+      tone: "warning",
+      message: (name) => (
+        <>
+          Move <strong>"{name}"</strong> to archive? Opening it will show an
+          OBSOLETE stamp.
+        </>
+      ),
+    },
+    unarchive: {
+      title: "Restore from Archive",
+      confirmLabel: "Restore",
+      tone: "primary",
+      message: (name) => (
+        <>
+          Restore <strong>"{name}"</strong> from archive?
+        </>
+      ),
+    },
+    restore: {
+      title: "Restore File",
+      confirmLabel: "Restore",
+      tone: "primary",
+      message: (name) => (
+        <>
+          Restore <strong>"{name}"</strong> from trash?
+        </>
+      ),
+    },
+    permanentDelete: {
+      title: "Delete Forever",
+      confirmLabel: "Delete Forever",
+      tone: "danger",
+      message: (name) => (
+        <>
+          Permanently delete <strong>"{name}"</strong>? This cannot be undone.
+        </>
+      ),
+    },
+  };
+
+  const handleConfirmAction = () => {
+    if (!confirmTarget) return;
+    const { id, action } = confirmTarget;
+
+    const close = () => setConfirmTarget(null);
+
+    if (action === "delete") {
+      deleteFile.mutate(id, { onSettled: close });
+      return;
     }
+    if (action === "archive") {
+      archiveFileMutation.mutate(id, { onSettled: close });
+      return;
+    }
+    if (action === "unarchive") {
+      unarchiveFileMutation.mutate(id, { onSettled: close });
+      return;
+    }
+    if (action === "restore") {
+      restoreFile.mutate(id, {
+        onError: () => toast.error("Failed to restore file. Please try again."),
+        onSettled: close,
+      });
+      return;
+    }
+    permanentDeleteFile.mutate(id, {
+      onError: () =>
+        toast.error("Failed to permanently delete file. Please try again."),
+      onSettled: close,
+    });
   };
 
   const formatFileSize = (bytes: number) => {
@@ -1201,6 +1270,83 @@ const FileList: React.FC<FileListProps> = ({
         }}
         fileId={selectedFileForMove?.id || null}
         fileName={selectedFileForMove?.name || ""}
+      />
+
+      <PromptModal
+        isOpen={!!renameTarget}
+        title="Rename File"
+        label="File name"
+        initialValue={renameTarget?.name || ""}
+        confirmLabel="Rename"
+        isLoading={updateFile.isPending}
+        onClose={() => setRenameTarget(null)}
+        onSubmit={(newName) => {
+          if (!renameTarget || newName === renameTarget.name) {
+            setRenameTarget(null);
+            return;
+          }
+          updateFile.mutate(
+            { id: renameTarget.id, name: newName },
+            { onSettled: () => setRenameTarget(null) }
+          );
+        }}
+      />
+
+      <PromptModal
+        isOpen={!!dateEditTarget}
+        title="Edit Upload Date"
+        label="Upload date"
+        description="Super Admin only"
+        inputType="date"
+        initialValue={dateEditTarget?.date || ""}
+        confirmLabel="Update Date"
+        isLoading={updateFile.isPending}
+        onClose={() => setDateEditTarget(null)}
+        onSubmit={(next) => {
+          if (!dateEditTarget) return;
+          const parsed = new Date(next);
+          if (Number.isNaN(parsed.getTime())) {
+            toast.error("Invalid date");
+            return;
+          }
+          updateFile.mutate(
+            { id: dateEditTarget.id, created_at: parsed.toISOString() },
+            { onSettled: () => setDateEditTarget(null) }
+          );
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={!!confirmTarget}
+        title={
+          confirmTarget
+            ? confirmActionMeta[confirmTarget.action].title
+            : "Confirm"
+        }
+        message={
+          confirmTarget
+            ? confirmActionMeta[confirmTarget.action].message(confirmTarget.name)
+            : ""
+        }
+        confirmLabel={
+          confirmTarget
+            ? confirmActionMeta[confirmTarget.action].confirmLabel
+            : "Confirm"
+        }
+        tone={
+          confirmTarget
+            ? confirmActionMeta[confirmTarget.action].tone
+            : "danger"
+        }
+        isLoading={
+          deleteFile.isPending ||
+          archiveFileMutation.isPending ||
+          unarchiveFileMutation.isPending ||
+          restoreFile.isPending ||
+          permanentDeleteFile.isPending
+        }
+        onClose={() => setConfirmTarget(null)}
+        onConfirm={handleConfirmAction}
       />
     </div>
   );

@@ -139,11 +139,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
   return (
     <Dialog open={isOpen} onClose={handleClose} className="relative z-50">
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 bg-transparent backdrop-blur-md"
         aria-hidden="true"
       />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-white rounded-2xl shadow-2xl max-w-md w-full transform transition-all">
+      <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
+        <Dialog.Panel className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full max-h-[min(90vh,720px)] overflow-y-auto my-auto transform transition-all">
           <div className="flex items-center justify-between p-6 border-b border-gray-100">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-blue-100 rounded-lg">

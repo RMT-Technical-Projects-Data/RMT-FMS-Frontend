@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { useLogin } from "../hooks/useAuth";
 
 const LoginPage: React.FC = () => {
@@ -8,11 +9,13 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const login = useLogin();
   const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError("");
     login.mutate(
       { username, password },
       {
@@ -22,7 +25,8 @@ const LoginPage: React.FC = () => {
           navigate("/dashboard");
         },
         onError: () => {
-          alert("Login failed");
+          setLoginError("Login failed. Check your username and password.");
+          toast.error("Login failed");
         },
       }
     );
@@ -84,6 +88,11 @@ const LoginPage: React.FC = () => {
             </p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {loginError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {loginError}
+              </div>
+            )}
             <div>
               <label
                 htmlFor="username"

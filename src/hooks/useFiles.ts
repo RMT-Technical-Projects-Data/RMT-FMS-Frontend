@@ -62,7 +62,8 @@ const uploadFile = async (data: FormData): Promise<File> => {
     });
 
     console.log("✅ Upload successful:", response.data);
-    return response.data as File;
+    // Backend returns { files: [...] } for bulk upload
+    return response.data as any;
   } catch (error: any) {
     console.error("❌ Upload failed:", error);
     if (error.response) {
@@ -410,11 +411,30 @@ const fetchDownloadAuditLogs = async (): Promise<{
   return response.data;
 };
 
-const fetchArchivedFiles = async (): Promise<File[]> => {
-  const response = await axios.get(`${API_BASE_URL}/files/archived`, {
+const fetchArchivedFiles = async (
+  folderId: number | null = null
+): Promise<File[]> => {
+  const url =
+    folderId !== null
+      ? `${API_BASE_URL}/files/archived?folder_id=${folderId}`
+      : `${API_BASE_URL}/files/archived`;
+  const response = await axios.get(url, {
     headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
   });
   return response.data.files as File[];
+};
+
+const fetchArchivedFolders = async (
+  parentId: number | null = null
+): Promise<import("../types").Folder[]> => {
+  const url =
+    parentId !== null
+      ? `${API_BASE_URL}/folders/archived?parent_id=${parentId}`
+      : `${API_BASE_URL}/folders/archived`;
+  const response = await axios.get(url, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+  return response.data.folders as import("../types").Folder[];
 };
 
 const archiveFile = async (id: number): Promise<{ message: string; file: File }> => {
@@ -583,18 +603,30 @@ export const useUploadFile = () => {
     mutationFn: uploadFile,
     onSuccess: (data) => {
       console.log("🎉 FILE UPLOAD SUCCESS:", data);
-
       queryClient.invalidateQueries({ queryKey: ["files"] });
       queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
-      // Invalidate all file queries to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ["files", undefined] });
-      toast.success(`File  uploaded successfully!`);
+      // Toast deferred until stamp preference is chosen in UploadModal
     },
     onError: (error: any) => {
       console.error("Upload mutation error:", error);
       toast.error(error.response?.data?.message || "Failed to upload file");
     },
   });
+};
+
+export const setMasterStampPreference = async (
+  fileIds: number[],
+  has_master_stamp: boolean
+) => {
+  const response = await axios.post(
+    `${API_BASE_URL}/files/stamp-preference`,
+    { fileIds, has_master_stamp },
+    {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    }
+  );
+  return response.data;
 };
 
 export const useUploadFolder = () => {
@@ -636,9 +668,7 @@ export const useUploadFolder = () => {
       }, 1000);
 
       console.log("✅ All queries invalidated and refetched");
-      toast.success(
-        `Folder uploaded successfully! ${data.files.length} files added.`
-      );
+      // Toast deferred until stamp preference is chosen in UploadModal
     },
     onError: (error: any) => {
       console.error("❌ FOLDER UPLOAD ERROR:", error);
@@ -706,10 +736,17 @@ export const useDownloadAuditLogs = () =>
     enabled: !!localStorage.getItem("token"),
   });
 
-export const useArchivedFiles = () =>
+export const useArchivedFiles = (folderId: number | null = null) =>
   useQuery({
-    queryKey: ["archivedFiles"],
-    queryFn: fetchArchivedFiles,
+    queryKey: ["archivedFiles", folderId],
+    queryFn: () => fetchArchivedFiles(folderId),
+    enabled: !!localStorage.getItem("token"),
+  });
+
+export const useArchivedFolders = (parentId: number | null = null) =>
+  useQuery({
+    queryKey: ["archivedFolders", parentId],
+    queryFn: () => fetchArchivedFolders(parentId),
     enabled: !!localStorage.getItem("token"),
   });
 
@@ -721,7 +758,8 @@ export const useArchiveFile = () => {
       queryClient.invalidateQueries({ queryKey: ["files"] });
       queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
       queryClient.invalidateQueries({ queryKey: ["archivedFiles"] });
-      toast.success("Document moved to archive");
+      queryClient.invalidateQueries({ queryKey: ["archivedFolders"] });
+      toast.success("Document moved to archive with its folder path");
     },
     onError: (error: any) => {
       toast.error(
@@ -741,6 +779,7 @@ export const useUnarchiveFile = () => {
       queryClient.invalidateQueries({ queryKey: ["files"] });
       queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
       queryClient.invalidateQueries({ queryKey: ["archivedFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["archivedFolders"] });
       toast.success("Document restored from archive");
     },
     onError: (error: any) => {

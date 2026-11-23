@@ -609,6 +609,8 @@ import FileList from "./FileList";
 import UploadModal from "./UploadModal";
 import PermissionModal from "./PermissionModal";
 import CreateFolderModal from "../components/CreateFolderModal"; // New import
+import ConfirmModal from "./ConfirmModal";
+import PromptModal from "./PromptModal";
 import {
   useCreateFolder,
   useRootFolders,
@@ -674,6 +676,14 @@ const FileManagement: React.FC<FileManagementProps> = ({
   // State for create folder modal
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] =
     React.useState(false);
+  const [renameFolderTarget, setRenameFolderTarget] = React.useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] = React.useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   // Debug logging
   console.log("🔍 [FileManagement] Data state:", {
@@ -844,21 +854,12 @@ const FileManagement: React.FC<FileManagementProps> = ({
   };
 
   const handleRenameFolder = (folderId: number, currentName: string) => {
-    const newName = prompt("Enter new folder name", currentName);
-    if (newName && newName.trim() && newName !== currentName) {
-      updateFolder.mutate({ id: folderId, name: newName.trim() });
-    }
+    setRenameFolderTarget({ id: folderId, name: currentName });
     setOpenDropdownId(null);
   };
 
   const handleDeleteFolder = (folderId: number, folderName: string) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete "${folderName}"? This action cannot be undone.`
-      )
-    ) {
-      deleteFolder.mutate(folderId);
-    }
+    setDeleteFolderTarget({ id: folderId, name: folderName });
     setOpenDropdownId(null);
   };
 
@@ -1181,6 +1182,47 @@ const FileManagement: React.FC<FileManagementProps> = ({
           showToast={showToast} // Pass the toast function to PermissionModal
         />
       )}
+
+      <PromptModal
+        isOpen={!!renameFolderTarget}
+        title="Rename Folder"
+        label="Folder name"
+        initialValue={renameFolderTarget?.name || ""}
+        confirmLabel="Rename"
+        isLoading={updateFolder.isPending}
+        onClose={() => setRenameFolderTarget(null)}
+        onSubmit={(newName) => {
+          if (!renameFolderTarget || newName === renameFolderTarget.name) {
+            setRenameFolderTarget(null);
+            return;
+          }
+          updateFolder.mutate(
+            { id: renameFolderTarget.id, name: newName },
+            { onSettled: () => setRenameFolderTarget(null) }
+          );
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={!!deleteFolderTarget}
+        title="Delete Folder"
+        message={
+          <>
+            Delete folder <strong>"{deleteFolderTarget?.name}"</strong>? This
+            action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete Folder"
+        tone="danger"
+        isLoading={deleteFolder.isPending}
+        onClose={() => setDeleteFolderTarget(null)}
+        onConfirm={() => {
+          if (!deleteFolderTarget) return;
+          deleteFolder.mutate(deleteFolderTarget.id, {
+            onSettled: () => setDeleteFolderTarget(null),
+          });
+        }}
+      />
     </>
   );
 };
