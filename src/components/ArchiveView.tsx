@@ -29,7 +29,6 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
   } = useArchivedFiles(selectedFolderId);
   const {
     data: archivedFolders,
-    isLoading: foldersLoading,
     isError: foldersError,
   } = useArchivedFolders(selectedFolderId);
 
