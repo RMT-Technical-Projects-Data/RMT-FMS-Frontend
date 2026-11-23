@@ -384,18 +384,61 @@ export const useRootFiles = () =>
 const updateFile = async ({
   id,
   name,
+  created_at,
 }: {
   id: number;
-  name: string;
+  name?: string;
+  created_at?: string;
 }): Promise<File> => {
-  const response = await axios.put(
-    `${API_BASE_URL}/files/${id}`,
-    { name },
+  const body: { name?: string; created_at?: string } = {};
+  if (name !== undefined) body.name = name;
+  if (created_at !== undefined) body.created_at = created_at;
+
+  const response = await axios.put(`${API_BASE_URL}/files/${id}`, body, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+  return response.data as File;
+};
+
+const fetchDownloadAuditLogs = async (): Promise<{
+  logs: import("../types").DownloadAuditLog[];
+  total: number;
+}> => {
+  const response = await axios.get(`${API_BASE_URL}/files/audit/downloads`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+  return response.data;
+};
+
+const fetchArchivedFiles = async (): Promise<File[]> => {
+  const response = await axios.get(`${API_BASE_URL}/files/archived`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+  return response.data.files as File[];
+};
+
+const archiveFile = async (id: number): Promise<{ message: string; file: File }> => {
+  const response = await axios.post(
+    `${API_BASE_URL}/files/${id}/archive`,
+    {},
     {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     }
   );
-  return response.data as File;
+  return response.data;
+};
+
+const unarchiveFile = async (
+  id: number
+): Promise<{ message: string; file: File }> => {
+  const response = await axios.post(
+    `${API_BASE_URL}/files/${id}/unarchive`,
+    {},
+    {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    }
+  );
+  return response.data;
 };
 
 const deleteFile = async (id: number): Promise<{ message: string }> => {
@@ -636,15 +679,76 @@ export const useUpdateFile = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateFile,
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["files"] });
       queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
-      // Invalidate all file queries to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ["files", undefined] });
-      toast.success(`File renamed to "${data.name}" successfully!`);
+      if (variables.created_at && !variables.name) {
+        toast.success("Document upload date updated");
+      } else {
+        toast.success(`File renamed to "${data.name}" successfully!`);
+      }
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to update file");
+      toast.error(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to update file"
+      );
+    },
+  });
+};
+
+export const useDownloadAuditLogs = () =>
+  useQuery({
+    queryKey: ["downloadAuditLogs"],
+    queryFn: fetchDownloadAuditLogs,
+    enabled: !!localStorage.getItem("token"),
+  });
+
+export const useArchivedFiles = () =>
+  useQuery({
+    queryKey: ["archivedFiles"],
+    queryFn: fetchArchivedFiles,
+    enabled: !!localStorage.getItem("token"),
+  });
+
+export const useArchiveFile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: archiveFile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["archivedFiles"] });
+      toast.success("Document moved to archive");
+    },
+    onError: (error: any) => {
+      toast.error(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to archive file"
+      );
+    },
+  });
+};
+
+export const useUnarchiveFile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: unarchiveFile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["archivedFiles"] });
+      toast.success("Document restored from archive");
+    },
+    onError: (error: any) => {
+      toast.error(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to unarchive file"
+      );
     },
   });
 };

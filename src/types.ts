@@ -32,7 +32,19 @@ export interface File {
   updated_at: string;
   is_deleted: boolean;
   deleted_at?: string | null;
+  is_archived?: boolean;
+  archived_at?: string | null;
   folder_name?: string; // For joined queries
+}
+
+export interface DownloadAuditLog {
+  id: number;
+  user_id: number | null;
+  username: string;
+  file_id: number | null;
+  document_name: string;
+  downloaded_at: string;
+  ip_address?: string | null;
 }
 
 export interface Permission {

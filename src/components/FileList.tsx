@@ -543,6 +543,8 @@ import {
   useRestoreFile,
   usePermanentDeleteFile,
   useUpdateFile,
+  useArchiveFile,
+  useUnarchiveFile,
 } from "../hooks/useFiles";
 import { useUserPermissions } from "../hooks/usePermissions";
 import {
@@ -571,6 +573,7 @@ interface FileListProps {
   userId?: number;
   showFavouriteToggle?: boolean;
   isTrashView?: boolean;
+  isArchiveView?: boolean;
 
   // 👇 ADDED THESE PROPS to fix the TrashView error
   selectedFileIds?: number[];
@@ -583,6 +586,7 @@ const FileList: React.FC<FileListProps> = ({
   userRole,
   userId,
   isTrashView = false,
+  isArchiveView = false,
   // 👇 Destructure new props
   selectedFileIds,
   onToggleSelection,
@@ -590,6 +594,8 @@ const FileList: React.FC<FileListProps> = ({
   // const downloadFile = useDownloadFile();
   const deleteFile = useDeleteFile();
   const updateFile = useUpdateFile();
+  const archiveFileMutation = useArchiveFile();
+  const unarchiveFileMutation = useUnarchiveFile();
   // const toggleFavourite = useToggleFileFavourite();
   const restoreFile = useRestoreFile();
   const permanentDeleteFile = usePermanentDeleteFile();
@@ -601,6 +607,13 @@ const FileList: React.FC<FileListProps> = ({
     id: number;
     name: string;
   } | null>(null);
+
+  // Super Admin discreet upload-date edit (5 rapid clicks on the date)
+  const dateClickRef = React.useRef<{ fileId: number | null; count: number; timer: ReturnType<typeof setTimeout> | null }>({
+    fileId: null,
+    count: 0,
+    timer: null,
+  });
 
   const handleMoveClick = (fileId: number, fileName: string) => {
     console.log("🖱️ Move icon clicked:", { fileId, fileName });
@@ -706,8 +719,8 @@ const FileList: React.FC<FileListProps> = ({
         return;
       }
 
-      // Use the correct backend endpoint: /files/download/{id}
-      const fileUrl = `https://rmtfms.duckdns.org/api/files/download/${file.id}`;
+      // Use configured API base (stamped PDF + audit logging happen server-side)
+      const fileUrl = `${API_BASE_URL}/files/download/${file.id}`;
       console.log(`📥 Downloading from: ${fileUrl}`);
 
       const response = await fetch(fileUrl, {
@@ -719,6 +732,7 @@ const FileList: React.FC<FileListProps> = ({
 
       if (!response.ok) {
         console.error("Failed to download file");
+        toast.error("Failed to download file");
         return;
       }
 
@@ -797,6 +811,66 @@ const FileList: React.FC<FileListProps> = ({
     const newName = window.prompt("Enter new file name:", currentName);
     if (newName && newName.trim() !== "" && newName !== currentName) {
       updateFile.mutate({ id: fileId, name: newName });
+    }
+  };
+
+  /**
+   * Discreet Super Admin interaction: 5 clicks on the upload date within 2s
+   * opens a date editor. Regular users see no affordance and clicks do nothing.
+   */
+  const handleUploadDateClick = (file: File, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (userRole !== "super_admin" || isTrashView) return;
+
+    const ref = dateClickRef.current;
+    if (ref.timer) clearTimeout(ref.timer);
+
+    if (ref.fileId !== file.id) {
+      ref.fileId = file.id;
+      ref.count = 1;
+    } else {
+      ref.count += 1;
+    }
+
+    if (ref.count >= 5) {
+      ref.count = 0;
+      ref.fileId = null;
+      const current = file.created_at
+        ? new Date(file.created_at).toISOString().slice(0, 10)
+        : "";
+      const next = window.prompt(
+        "Update document upload date (YYYY-MM-DD):",
+        current
+      );
+      if (!next) return;
+      const parsed = new Date(next);
+      if (Number.isNaN(parsed.getTime())) {
+        toast.error("Invalid date format");
+        return;
+      }
+      updateFile.mutate({ id: file.id, created_at: parsed.toISOString() });
+      return;
+    }
+
+    ref.timer = setTimeout(() => {
+      ref.count = 0;
+      ref.fileId = null;
+    }, 2000);
+  };
+
+  const handleArchive = (fileId: number, fileName: string) => {
+    if (
+      window.confirm(
+        `Move "${fileName}" to archive? Opening it will show an OBSOLETE stamp.`
+      )
+    ) {
+      archiveFileMutation.mutate(fileId);
+    }
+  };
+
+  const handleUnarchive = (fileId: number, fileName: string) => {
+    if (window.confirm(`Restore "${fileName}" from archive?`)) {
+      unarchiveFileMutation.mutate(fileId);
     }
   };
 
@@ -891,9 +965,11 @@ const FileList: React.FC<FileListProps> = ({
             No files found
           </h3>
           <p className="text-gray-500 max-w-sm mx-auto">
-            {files.length === 0
-              ? "Get started by uploading your first file."
-              : "No files match your search."}
+            {isTrashView
+              ? "Trash is empty."
+              : isArchiveView
+              ? "No archived documents."
+              : "Get started by uploading your first file."}
           </p>
         </div>
       ) : (
@@ -908,7 +984,7 @@ const FileList: React.FC<FileListProps> = ({
               <div
                 key={file.id}
                 className={`flex items-center space-x-4 p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200 ${canView ? "cursor-pointer" : "cursor-not-allowed opacity-50"
-                  } ${isTrashView ? "opacity-75" : ""}`}
+                  } ${isTrashView || isArchiveView ? "opacity-75" : ""}`}
               >
 
                 {/* 👇 CHECKBOX ADDED HERE */}
@@ -934,7 +1010,14 @@ const FileList: React.FC<FileListProps> = ({
                   <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
                     <span>{formatFileSize(file.size || 0)}</span>
                     <span>•</span>
-                    <span>
+                    <span
+                      onClick={(e) => handleUploadDateClick(file, e)}
+                      className={
+                        userRole === "super_admin" && !isTrashView
+                          ? "select-none"
+                          : undefined
+                      }
+                    >
                       {new Date(file.created_at).toLocaleDateString()}
                     </span>
                     {isTrashView && (
@@ -943,6 +1026,14 @@ const FileList: React.FC<FileListProps> = ({
                         <span className="text-red-500 text-xs font-medium flex items-center">
                           <FiClock className="mr-1" size={12} />
                           {calculateRemainingDays(file.deleted_at)} days left
+                        </span>
+                      </>
+                    )}
+                    {isArchiveView && (
+                      <>
+                        <span>•</span>
+                        <span className="text-amber-600 text-xs font-medium">
+                          Obsolete / Archived
                         </span>
                       </>
                     )}
@@ -955,8 +1046,8 @@ const FileList: React.FC<FileListProps> = ({
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {/* Move button (left of Open in new window) */}
-                  {!isTrashView && (userRole === "super_admin" || file.created_by === userId) && (
+                  {/* Rename */}
+                  {!isTrashView && !isArchiveView && (userRole === "super_admin" || file.created_by === userId) && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -969,8 +1060,8 @@ const FileList: React.FC<FileListProps> = ({
                     </button>
                   )}
 
-                  {/* Move button (left of Open in new window) */}
-                  {canView && !isTrashView && userRole === "super_admin" && (
+                  {/* Move */}
+                  {canView && !isTrashView && !isArchiveView && userRole === "super_admin" && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -983,22 +1074,21 @@ const FileList: React.FC<FileListProps> = ({
                     </button>
                   )}
 
-                  {/* Open in new window button (for view permission) */}
+                  {/* Open — allowed in archive (OBSOLETE stamp applied server-side for PDFs) */}
                   {canView && !isTrashView && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        // const token = localStorage.getItem("token") || "";
                         handleOpenFile(file);
                       }}
                       className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-                      title="Open in new window"
+                      title={isArchiveView ? "Open (OBSOLETE)" : "Open in new window"}
                     >
                       <FiExternalLink size={18} />
                     </button>
                   )}
 
-                  {/* Download button (for download permission) */}
+                  {/* Download */}
                   {canDownload && !isTrashView && (
                     <button
                       onClick={(e) => {
@@ -1014,6 +1104,7 @@ const FileList: React.FC<FileListProps> = ({
 
                   {userRole === "super_admin" &&
                     !isTrashView &&
+                    !isArchiveView &&
                     !file.folder_id && (
                       <button
                         onClick={(e) => {
@@ -1026,6 +1117,34 @@ const FileList: React.FC<FileListProps> = ({
                         <FiKey size={18} />
                       </button>
                     )}
+
+                  {/* Archive (move out of active docs) */}
+                  {!isTrashView && !isArchiveView && userRole === "super_admin" && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleArchive(file.id, file.name);
+                      }}
+                      className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-colors"
+                      title="Move to Archive"
+                    >
+                      <FiArchive size={18} />
+                    </button>
+                  )}
+
+                  {/* Archive view actions */}
+                  {isArchiveView && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUnarchive(file.id, file.name);
+                      }}
+                      className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors"
+                      title="Restore from Archive"
+                    >
+                      <FiRotateCcw size={18} />
+                    </button>
+                  )}
 
                   {/* Trash view actions */}
                   {isTrashView && (
@@ -1053,8 +1172,8 @@ const FileList: React.FC<FileListProps> = ({
                     </>
                   )}
 
-                  {/* Regular view actions */}
-                  {!isTrashView && userRole === "super_admin" && (
+                  {/* Regular view — soft delete to trash */}
+                  {!isTrashView && !isArchiveView && userRole === "super_admin" && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

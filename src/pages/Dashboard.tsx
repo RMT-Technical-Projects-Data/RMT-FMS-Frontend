@@ -5,7 +5,8 @@ import {
   FiUsers,
   FiLogOut,
   FiMenu,
-
+  FiArchive,
+  FiActivity,
   // FiStar,
   FiTrash2,
 } from "react-icons/fi";
@@ -15,6 +16,8 @@ import UserManagementView from "../components/UserManagementView";
 // import FavoritesView from "../components/FavoritesView";
 // import FavoritesNavigationView from "../components/FavoritesNavigationView";
 import TrashView from "../components/TrashView";
+import ArchiveView from "../components/ArchiveView";
+import DownloadAuditView from "../components/DownloadAuditView";
 import type { User } from "../types";
 
 const Dashboard: React.FC = () => {
@@ -215,8 +218,22 @@ const Dashboard: React.FC = () => {
     // },
   ];
 
-  // Add Trash and Users sections only for super_admin
+  // Archive is available to all authenticated users (scoped server-side)
+  navigationItems.push({
+    id: "archive",
+    name: "Archive",
+    icon: FiArchive,
+    color: "text-amber-600",
+  });
+
+  // Trash, Audit Logs, and Users — Super Admin only
   if (user.role === "super_admin") {
+    navigationItems.push({
+      id: "audit",
+      name: "Download Logs",
+      icon: FiActivity,
+      color: "text-teal-600",
+    });
     navigationItems.push({
       id: "trash",
       name: "Trash",
@@ -363,6 +380,8 @@ const Dashboard: React.FC = () => {
                 <h1 className="text-2xl font-bold text-gray-900">
                   {activeView === "dashboard" && "Dashboard"}
                   {/* {activeView === "favorites" && "Favorites"} */}
+                  {activeView === "archive" && "Archive"}
+                  {activeView === "audit" && "Download Activity"}
                   {activeView === "trash" && "Trash"}
                   {activeView === "users" && "User Management"}
                 </h1>
@@ -405,6 +424,16 @@ const Dashboard: React.FC = () => {
                 setEditingUser={setEditingUser}
                 onUserCreated={handleUserCreated}
                 onUserManagementClose={handleUserManagementClose}
+              />
+            ) : activeView === "audit" ? (
+              <DownloadAuditView user={user} />
+            ) : activeView === "archive" ? (
+              <ArchiveView
+                user={user}
+                onAssignPermission={(resourceId, resourceType) => {
+                  setPermissionResource({ id: resourceId, type: resourceType });
+                  setIsPermissionModalOpen(true);
+                }}
               />
             ) : /* activeView === "favorites" ? (
               selectedFolderId ? (
