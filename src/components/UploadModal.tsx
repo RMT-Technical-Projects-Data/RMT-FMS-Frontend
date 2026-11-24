@@ -335,8 +335,9 @@ const UploadModal: React.FC<UploadModalProps> = ({
                   green <strong>MASTER COPY</strong> tag when opened.
                 </p>
                 <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-                  With stamp → green “MASTER COPY” box at the top-center of page 1
-                  (open only). Downloads get a blue CONTROLLED COPY stamp instead.
+                  With stamp → green “MASTER COPY” at top-center when you Open the
+                  file. Download adds MASTER COPY (top-center) + CONTROLLED COPY
+                  (bottom-center).
                 </div>
               </div>
               <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
