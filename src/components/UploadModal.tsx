@@ -332,10 +332,11 @@ const UploadModal: React.FC<UploadModalProps> = ({
               <div className="p-6 space-y-4">
                 <p className="text-sm text-gray-600">
                   Upload finished. Choose whether these documents should show a
-                  green <strong>Master Copy</strong> tag on the first page.
+                  green <strong>Master Copy</strong> tag when opened.
                 </p>
                 <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-                  With stamp → green “Master Copy” box on the top-right of page 1.
+                  With stamp → green “Master Copy” box at the top-center of page 1
+                  (open only). Downloads get a blue Controlled Copy stamp instead.
                 </div>
               </div>
               <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
