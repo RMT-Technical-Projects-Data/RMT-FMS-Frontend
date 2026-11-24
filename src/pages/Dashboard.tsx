@@ -412,7 +412,7 @@ const Dashboard: React.FC = () => {
                     size={16}
                   />
                   <input
-                    type="search"
+                    type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={
@@ -428,6 +428,7 @@ const Dashboard: React.FC = () => {
                       onClick={() => setSearchQuery("")}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded-md"
                       title="Clear search"
+                      aria-label="Clear search"
                     >
                       <FiX size={14} />
                     </button>
