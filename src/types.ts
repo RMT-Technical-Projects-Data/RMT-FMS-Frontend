@@ -44,6 +44,7 @@ export interface DownloadAuditLog {
   username: string;
   file_id: number | null;
   document_name: string;
+  document_status?: "controlled" | "obsolete" | string | null;
   downloaded_at: string;
   ip_address?: string | null;
 }

@@ -64,6 +64,9 @@ const DownloadAuditView: React.FC<DownloadAuditViewProps> = ({ user }) => {
                     Document Name
                   </th>
                   <th className="text-left font-semibold text-gray-600 px-4 py-3">
+                    Document Status
+                  </th>
+                  <th className="text-left font-semibold text-gray-600 px-4 py-3">
                     Download Date
                   </th>
                   <th className="text-left font-semibold text-gray-600 px-4 py-3">
@@ -74,6 +77,9 @@ const DownloadAuditView: React.FC<DownloadAuditViewProps> = ({ user }) => {
               <tbody>
                 {logs.map((log) => {
                   const when = new Date(log.downloaded_at);
+                  const isObsolete =
+                    String(log.document_status || "").toLowerCase() ===
+                    "obsolete";
                   return (
                     <tr
                       key={log.id}
@@ -84,6 +90,17 @@ const DownloadAuditView: React.FC<DownloadAuditViewProps> = ({ user }) => {
                       </td>
                       <td className="px-4 py-3 text-gray-700">
                         {log.document_name}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                            isObsolete
+                              ? "bg-red-50 text-red-700 border border-red-200"
+                              : "bg-blue-50 text-blue-700 border border-blue-200"
+                          }`}
+                        >
+                          {isObsolete ? "Obsolete" : "Controlled"}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-gray-600">
                         {when.toLocaleDateString()}
