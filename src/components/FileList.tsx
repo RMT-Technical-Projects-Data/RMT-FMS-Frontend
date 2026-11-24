@@ -788,41 +788,48 @@ const FileList: React.FC<FileListProps> = ({
   };
 
   const handleOpenFile = async (file: File) => {
-    // Check for unsupported formats
-    if (/\.(docx|xlsx)$/i.test(file.name)) {
-      toast.error("format/extension not supported by browser");
-      return;
-    }
-
     try {
       const token = localStorage.getItem("token") || "";
 
-      // 1️⃣ Ask backend for short-lived signed URL
-      const res = await fetch(
-        `${API_BASE_URL}/files/open/${file.id}/url`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      // Ask backend for short-lived signed URL
+      const res = await fetch(`${API_BASE_URL}/files/open/${file.id}/url`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (!res.ok) throw new Error("Failed to get file URL");
       const data = await res.json();
-      let fileUrl = data.url;
+      let fileUrl = String(data.url || "");
 
-      // 2️⃣ Check if it's an Office file and we are on a public accessible domain (not localhost)
-      // Office Web Viewer cannot access localhost URLs
-      const isOfficeFile = /\.(docx|doc|xlsx|xls|pptx|ppt)$/i.test(file.name);
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-      if (isOfficeFile && !isLocalhost) {
-        // Wrap with Microsoft Office Web Viewer
-        const encodedUrl = encodeURIComponent(fileUrl);
-        fileUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`;
-      } else if (isOfficeFile && isLocalhost) {
-        console.warn("⚠️ Cannot open Office Preview on localhost. Browser will download instead.");
+      // Prefer a public HTTPS URL so Office Online can fetch the file
+      try {
+        const parsed = new URL(fileUrl);
+        const isLocalHost =
+          parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+        if (isLocalHost && API_BASE_URL.startsWith("https://")) {
+          const api = new URL(API_BASE_URL);
+          parsed.protocol = api.protocol;
+          parsed.host = api.host;
+          fileUrl = parsed.toString();
+        }
+      } catch {
+        // keep original url
       }
 
-      // 3️⃣ Open URL
+      const isOfficeFile = /\.(docx?|xlsx?|pptx?)$/i.test(file.name);
+      const urlIsPublicHttps = /^https:\/\//i.test(fileUrl);
+
+      if (isOfficeFile && urlIsPublicHttps) {
+        // Microsoft Office Online viewer (no download required)
+        fileUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
+          fileUrl
+        )}`;
+      } else if (isOfficeFile && !urlIsPublicHttps) {
+        toast.info(
+          "Office preview needs a public HTTPS link. Open this app on the deployed site to view Word/Excel/PowerPoint in the browser."
+        );
+        return;
+      }
+
       window.open(fileUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
       console.error("❌ Error opening file:", err);

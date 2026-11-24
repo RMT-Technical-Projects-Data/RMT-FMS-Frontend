@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Dialog } from "@headlessui/react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useUploadFile,
   useUploadFolder,
   setMasterStampPreference,
+  invalidateAfterUpload,
 } from "../hooks/useFiles";
 import { FiUpload, FiX, FiFile, FiFolder, FiCloud } from "react-icons/fi";
 import { toast } from "react-toastify";
@@ -15,16 +17,23 @@ interface UploadModalProps {
   existingFolderNames?: string[];
 }
 
-const extractUploadedIds = (data: any): number[] => {
+type UploadedItem = { id: number; name: string };
+
+const extractUploadedItems = (data: any): UploadedItem[] => {
   if (!data) return [];
-  if (Array.isArray(data.files)) {
-    return data.files.map((f: any) => f.id).filter((id: any) => !!id);
-  }
-  if (Array.isArray(data)) {
-    return data.map((f: any) => f.id).filter((id: any) => !!id);
-  }
-  if (data.id) return [data.id];
-  return [];
+  const list = Array.isArray(data.files)
+    ? data.files
+    : Array.isArray(data)
+      ? data
+      : data.id
+        ? [data]
+        : [];
+  return list
+    .filter((f: any) => f && f.id)
+    .map((f: any) => ({
+      id: Number(f.id),
+      name: f.name || f.original_name || `File ${f.id}`,
+    }));
 };
 
 const UploadModal: React.FC<UploadModalProps> = ({
@@ -33,93 +42,54 @@ const UploadModal: React.FC<UploadModalProps> = ({
   folderId,
   existingFolderNames = [],
 }) => {
+  const queryClient = useQueryClient();
   const [uploadType, setUploadType] = useState<"file" | "folder">("file");
   const [files, setFiles] = useState<FileList | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [step, setStep] = useState<"upload" | "stamp">("upload");
-  const [uploadedIds, setUploadedIds] = useState<number[]>([]);
+  const [uploadedItems, setUploadedItems] = useState<UploadedItem[]>([]);
   const [savingStamp, setSavingStamp] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadFileMutation = useUploadFile();
   const uploadFolderMutation = useUploadFolder();
 
-  // ✅ Reset state when modal opens or closes
+  const isBusy =
+    savingStamp ||
+    uploadFileMutation.isPending ||
+    uploadFolderMutation.isPending;
+
   useEffect(() => {
     if (isOpen) {
       setFiles(null);
       setUploadType("file");
       setIsDragging(false);
       setStep("upload");
-      setUploadedIds([]);
+      setUploadedItems([]);
       setSavingStamp(false);
-      if (fileInputRef.current) fileInputRef.current.value = ""; // reset input
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }, [isOpen]);
 
-  const finishWithStampChoice = async (withStamp: boolean) => {
-    try {
-      setSavingStamp(true);
-      if (uploadedIds.length > 0) {
-        await setMasterStampPreference(uploadedIds, withStamp);
-      }
-      toast.success(
-        withStamp
-          ? "Upload complete Master Copy stamp enabled"
-          : "Upload complete without Master Copy stamp"
-      );
-      onClose();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.response?.data?.error || "Failed to save stamp preference");
-    } finally {
-      setSavingStamp(false);
-    }
-  };
-
-  // ✅ Reset files when switching between upload types
   const handleUploadTypeChange = (type: "file" | "folder") => {
     if (type !== uploadType) {
       setFiles(null);
-      if (fileInputRef.current) fileInputRef.current.value = ""; // reset input
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
     setUploadType(type);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    const input = e.target;
-
-    console.log("📁 Files selected:", files?.length);
-    console.log("📁 Input attributes:", {
-      webkitdirectory: input.webkitdirectory,
-      multiple: input.multiple,
-      type: input.type,
-    });
-
-    if (files) {
-      Array.from(files).forEach((file, index) => {
-        console.log(`📄 File ${index + 1}:`, {
-          name: file.name,
-          webkitRelativePath: (file as any).webkitRelativePath,
-          size: file.size,
-        });
-      });
-    }
-
-    setFiles(files);
+    setFiles(e.target.files);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    // Only allow drag & drop for files, not folders
     if (uploadType === "file") {
       setIsDragging(true);
       e.dataTransfer.dropEffect = "copy";
     } else {
-      // For folders, show not allowed cursor
       e.dataTransfer.dropEffect = "none";
     }
   };
@@ -134,8 +104,6 @@ const UploadModal: React.FC<UploadModalProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-
-    // Only allow drag & drop for files, not folders
     if (
       uploadType === "file" &&
       e.dataTransfer.files &&
@@ -143,10 +111,15 @@ const UploadModal: React.FC<UploadModalProps> = ({
     ) {
       setFiles(e.dataTransfer.files);
     }
-    // For folders, do nothing (prevent default behavior)
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const goToStampStep = (data: any) => {
+    setUploadedItems(extractUploadedItems(data));
+    setStep("stamp");
+  };
+
+  /** Upload now; stamp confirmation comes next before files appear in the UI. */
+  const handleUpload = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!files || files.length === 0) {
@@ -158,19 +131,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
       return;
     }
 
-    const formData = new FormData();
-
-    // 0. Append folderId FIRST (Global metadata)
-    if (folderId !== null) {
-      if (uploadType === "folder") {
-        formData.append("folderId", folderId.toString()); // For folder upload
-      } else {
-        formData.append("folder_id", folderId.toString()); // For file upload (backend expects folder_id)
-      }
-    }
-
     if (uploadType === "folder") {
-      // Check if we have webkitRelativePath for folder structure
       const hasWebkitRelativePath = Array.from(files).some(
         (file) =>
           (file as any).webkitRelativePath &&
@@ -178,20 +139,31 @@ const UploadModal: React.FC<UploadModalProps> = ({
       );
 
       if (hasWebkitRelativePath) {
-        // Full folder structure with webkitRelativePath (file picker)
+        const topLevelFolders = new Set<string>();
+        Array.from(files).forEach((file) => {
+          const relPath = (file as any).webkitRelativePath;
+          if (relPath) topLevelFolders.add(relPath.split("/")[0]);
+        });
+
+        for (const folderName of topLevelFolders) {
+          if (existingFolderNames.includes(folderName)) {
+            toast.error(
+              `Folder '${folderName}' already exists in this directory. Please rename the folder or choose a different directory.`
+            );
+            return;
+          }
+        }
+
         const folderSet = new Set<string>();
         const filesArray: File[] = [];
         const pathsArray: string[] = [];
 
-        // 1. Collect and append files/paths
         for (const file of Array.from(files)) {
           const relPath = (file as any).webkitRelativePath;
           filesArray.push(file);
           pathsArray.push(relPath);
-
-          // Collect folder paths for empty folder creation
           const pathParts = relPath.split("/");
-          pathParts.pop(); // remove filename
+          pathParts.pop();
           let cumulativePath = "";
           for (const part of pathParts) {
             cumulativePath += (cumulativePath ? "/" : "") + part;
@@ -199,60 +171,27 @@ const UploadModal: React.FC<UploadModalProps> = ({
           }
         }
 
-        const allPaths = [...folderSet];
-
-        // Check for duplicate top-level folders
-        const topLevelFolders = new Set<string>();
-        Array.from(files).forEach((file) => {
-          const relPath = (file as any).webkitRelativePath;
-          if (relPath) {
-            const rootFolder = relPath.split("/")[0];
-            topLevelFolders.add(rootFolder);
-          }
-        });
-
-        // Check each top-level folder against existing folder names in the CURRENT directory
-        for (const folderName of topLevelFolders) {
-          if (existingFolderNames.includes(folderName)) {
-            toast.error(
-              `Folder '${folderName}' already exists in this directory. Please rename the folder or choose a different directory.`
-            );
-            return; // Stop upload
-          }
-        }
-
-        // Use the React Query mutation for folder upload with batched params
         uploadFolderMutation.mutate(
           {
             files: filesArray,
             paths: pathsArray,
             folderId,
-            allPaths,
+            allPaths: [...folderSet],
           },
           {
-            onSuccess: (data) => {
-              setUploadedIds(extractUploadedIds(data));
-              setStep("stamp");
-            },
+            onSuccess: goToStampStep,
             onError: (error: any) => {
-              console.error("Folder upload error:", error);
               toast.error(error.message || "Upload failed");
             },
           }
         );
       } else {
-        // Drag & drop folder upload - legacy simple structure
-        // Note: For drag-drop, file.webkitRelativePath is usually empty or specific. 
-        // We stick to simple logic here but ensure ID is already added.
-
         const filesArray: File[] = [];
         const pathsArray: string[] = [];
-
         for (const file of Array.from(files)) {
           filesArray.push(file);
-          pathsArray.push(file.name); // Legacy path usage
+          pathsArray.push(file.name);
         }
-
         uploadFolderMutation.mutate(
           {
             files: filesArray,
@@ -261,46 +200,68 @@ const UploadModal: React.FC<UploadModalProps> = ({
             allPaths: [],
           },
           {
-            onSuccess: (data) => {
-              setUploadedIds(extractUploadedIds(data));
-              setStep("stamp");
-            },
+            onSuccess: goToStampStep,
             onError: (error: any) => {
-              console.error("Folder upload error:", error);
               toast.error(error.message || "Upload failed");
             },
-          });
+          }
+        );
       }
     } else {
-      // Handle single file uploads
+      const formData = new FormData();
+      if (folderId !== null) {
+        formData.append("folder_id", folderId.toString());
+      }
       for (const file of Array.from(files)) {
         formData.append("files", file);
       }
-
       uploadFileMutation.mutate(formData, {
-        onSuccess: (data) => {
-          setUploadedIds(extractUploadedIds(data));
-          setStep("stamp");
-        },
+        onSuccess: goToStampStep,
         onError: (error: any) => {
-          console.error("File upload error:", error);
           toast.error(error.message || "Upload failed");
         },
       });
     }
   };
 
+  const applyAllStamp = async (withStamp: boolean) => {
+    try {
+      setSavingStamp(true);
+      const ids = uploadedItems.map((item) => item.id);
+      if (ids.length > 0) {
+        await setMasterStampPreference(ids, withStamp);
+      }
+      invalidateAfterUpload(queryClient);
+      toast.success("Upload complete");
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "Failed to save stamp preference"
+      );
+    } finally {
+      setSavingStamp(false);
+    }
+  };
+
   const selectedFile = files && files.length > 0 ? files[0] : null;
 
   return (
-    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+    <Dialog
+      open={isOpen}
+      onClose={() => {
+        if (!isBusy) onClose();
+      }}
+      className="relative z-50"
+    >
       <div
         className="fixed inset-0 bg-transparent backdrop-blur-md"
         aria-hidden="true"
       />
       <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
         <Dialog.Panel className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full max-h-[min(90vh,720px)] overflow-y-auto my-auto transform transition-all">
-          {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-100">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -309,19 +270,21 @@ const UploadModal: React.FC<UploadModalProps> = ({
               <div>
                 <Dialog.Title className="text-xl font-bold text-gray-900">
                   {step === "stamp"
-                    ? "Stamp Preference"
+                    ? "Confirm Stamp"
                     : `Upload ${uploadType === "file" ? "File(s)" : "Folder"}`}
                 </Dialog.Title>
                 <p className="text-sm text-gray-500">
                   {step === "stamp"
-                    ? "Apply Master Copy stamp to uploaded PDF(s)?"
+                    ? "Choose how these documents should be stamped"
                     : "Add new content to your storage"}
                 </p>
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              disabled={isBusy}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             >
               <FiX size={20} />
             </button>
@@ -331,28 +294,32 @@ const UploadModal: React.FC<UploadModalProps> = ({
             <>
               <div className="p-6 space-y-4">
                 <p className="text-sm text-gray-600">
-                  Upload finished. Choose whether these documents should show a
-                  green <strong>MASTER COPY</strong> tag when opened.
+                  Documents were uploaded successfully. Confirm the stamp option
+                  before they appear in your library.
                 </p>
-                <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-                  With stamp → green “MASTER COPY” at top-center when you Open the
-                  file. Download adds MASTER COPY (top-center) + CONTROLLED COPY
-                  (bottom-center).
-                </div>
+                <p className="text-sm text-gray-500">
+                  Select <strong>With Stamp</strong> or{" "}
+                  <strong>Without Stamp</strong>
+                  {uploadedItems.length > 1
+                    ? ` for all ${uploadedItems.length} documents`
+                    : ""}
+                  .
+                </p>
               </div>
+
               <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
                 <button
                   type="button"
-                  disabled={savingStamp}
-                  onClick={() => finishWithStampChoice(false)}
+                  disabled={isBusy}
+                  onClick={() => applyAllStamp(false)}
                   className="px-5 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-50"
                 >
                   Without Stamp
                 </button>
                 <button
                   type="button"
-                  disabled={savingStamp}
-                  onClick={() => finishWithStampChoice(true)}
+                  disabled={isBusy}
+                  onClick={() => applyAllStamp(true)}
                   className="px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-medium disabled:opacity-50"
                 >
                   {savingStamp ? "Saving…" : "With Stamp"}
@@ -361,132 +328,134 @@ const UploadModal: React.FC<UploadModalProps> = ({
             </>
           ) : (
             <>
-          {/* Content */}
-          <div className="p-6 space-y-6">
-            {/* Upload Type */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleUploadTypeChange("file")}
-                className={`p-4 border-2 rounded-xl text-center transition-all ${uploadType === "file"
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-gray-200 hover:border-gray-300 text-gray-600"
-                  }`}
-              >
-                <FiFile size={24} className="mx-auto mb-2" />
-                <div className="font-medium">File(s)</div>
-              </button>
-              <button
-                onClick={() => handleUploadTypeChange("folder")}
-                className={`p-4 border-2 rounded-xl text-center transition-all ${uploadType === "folder"
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-gray-200 hover:border-gray-300 text-gray-600"
-                  }`}
-              >
-                <FiFolder size={24} className="mx-auto mb-2" />
-                <div className="font-medium">Folder</div>
-              </button>
-            </div>
-
-            {/* Drop Zone */}
-            <div
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${uploadType === "file" && isDragging
-                ? "border-blue-500 bg-blue-50"
-                : uploadType === "folder" && isDragging
-                  ? "border-red-500 bg-red-50"
-                  : "border-gray-300 hover:border-gray-400"
-                }`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                {...(uploadType === "folder"
-                  ? { webkitdirectory: "true" }
-                  : {})}
-                onChange={handleFileChange}
-                className="hidden"
-                title={
-                  uploadType === "folder" ? "Select a folder" : "Select files"
-                }
-              />
-
-              <FiCloud className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-
-              {selectedFile ? (
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {uploadType === "folder"
-                      ? `${files?.length} files selected`
-                      : `${files?.length} file(s) selected`}
-                  </p>
-                  {uploadType === "folder" && (
-                    <p className="text-sm text-blue-600 mt-2">
-                      ✓ Folder structure will be preserved
-                    </p>
-                  )}
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleUploadTypeChange("file")}
+                    className={`p-4 border-2 rounded-xl text-center transition-all ${
+                      uploadType === "file"
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-200 hover:border-gray-300 text-gray-600"
+                    }`}
+                  >
+                    <FiFile size={24} className="mx-auto mb-2" />
+                    <div className="font-medium">File(s)</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleUploadTypeChange("folder")}
+                    className={`p-4 border-2 rounded-xl text-center transition-all ${
+                      uploadType === "folder"
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-200 hover:border-gray-300 text-gray-600"
+                    }`}
+                  >
+                    <FiFolder size={24} className="mx-auto mb-2" />
+                    <div className="font-medium">Folder</div>
+                  </button>
                 </div>
-              ) : (
-                <div>
-                  {uploadType === "folder" && isDragging ? (
-                    <div>
-                      <p className="font-medium text-red-600">
-                        ⚠️ Drag & drop not allowed for folders
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Please click to browse and select a folder
-                      </p>
-                    </div>
-                  ) : (
+
+                <div
+                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+                    uploadType === "file" && isDragging
+                      ? "border-blue-500 bg-blue-50"
+                      : uploadType === "folder" && isDragging
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-300 hover:border-gray-400"
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    {...(uploadType === "folder"
+                      ? { webkitdirectory: "true" }
+                      : {})}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    title={
+                      uploadType === "folder"
+                        ? "Select a folder"
+                        : "Select files"
+                    }
+                  />
+
+                  <FiCloud className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+
+                  {selectedFile ? (
                     <div>
                       <p className="font-medium text-gray-900">
-                        {uploadType === "file"
-                          ? "Drag and drop your file(s) here or click to browse"
-                          : "Click to browse and select a folder"}
+                        {uploadType === "folder"
+                          ? `${files?.length} files selected`
+                          : `${files?.length} file(s) selected`}
                       </p>
                       {uploadType === "folder" && (
-                        <p className="text-sm text-blue-600 mt-1">
+                        <p className="text-sm text-blue-600 mt-2">
                           ✓ Folder structure will be preserved
                         </p>
                       )}
                     </div>
+                  ) : (
+                    <div>
+                      {uploadType === "folder" && isDragging ? (
+                        <div>
+                          <p className="font-medium text-red-600">
+                            ⚠️ Drag & drop not allowed for folders
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Please click to browse and select a folder
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {uploadType === "file"
+                              ? "Drag and drop your file(s) here or click to browse"
+                              : "Click to browse and select a folder"}
+                          </p>
+                          {uploadType === "folder" && (
+                            <p className="text-sm text-blue-600 mt-1">
+                              ✓ Folder structure will be preserved
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
 
-          {/* Footer */}
-          <div className="flex justify-end space-x-3 p-6 border-t border-gray-100">
-            <button
-              onClick={onClose}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={
-                !files ||
-                uploadFileMutation.isPending ||
-                uploadFolderMutation.isPending
-              }
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {uploadFileMutation.isPending ||
-                uploadFolderMutation.isPending ? (
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Uploading...</span>
-                </div>
-              ) : (
-                `Upload ${uploadType === "folder" ? "Folder" : "File(s)"}`
-              )}
-            </button>
-          </div>
+              <div className="flex justify-end space-x-3 p-6 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isBusy}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpload}
+                  disabled={!files || isBusy}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploadFileMutation.isPending ||
+                  uploadFolderMutation.isPending ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Uploading...</span>
+                    </div>
+                  ) : (
+                    `Upload ${uploadType === "folder" ? "Folder" : "File(s)"}`
+                  )}
+                </button>
+              </div>
             </>
           )}
         </Dialog.Panel>

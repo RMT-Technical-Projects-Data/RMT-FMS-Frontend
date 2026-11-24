@@ -618,16 +618,21 @@ export const useGlobalSearch = (query: string, enabled: boolean) =>
     placeholderData: (prev) => prev,
   });
 
+/** Call after stamp preference is saved so files appear in the UI. */
+export const invalidateAfterUpload = (queryClient: ReturnType<typeof useQueryClient>) => {
+  queryClient.invalidateQueries({ queryKey: ["files"] });
+  queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
+  queryClient.invalidateQueries({ queryKey: ["folders"] });
+  queryClient.invalidateQueries({ queryKey: ["rootFolders"] });
+  queryClient.invalidateQueries({ queryKey: ["folderTree"] });
+};
+
 export const useUploadFile = () => {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: uploadFile,
     onSuccess: (data) => {
       console.log("🎉 FILE UPLOAD SUCCESS:", data);
-      queryClient.invalidateQueries({ queryKey: ["files"] });
-      queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
-      queryClient.invalidateQueries({ queryKey: ["files", undefined] });
-      // Toast deferred until stamp preference is chosen in UploadModal
+      // List refresh deferred until stamp confirmation in UploadModal
     },
     onError: (error: any) => {
       console.error("Upload mutation error:", error);
@@ -651,51 +656,14 @@ export const setMasterStampPreference = async (
 };
 
 export const useUploadFolder = () => {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: uploadFolder,
     onSuccess: (data) => {
       console.log("🎉 FOLDER UPLOAD SUCCESS:", data);
-      console.log("🔄 Invalidating queries...");
-
-      // Invalidate all file and folder queries
-      queryClient.invalidateQueries({ queryKey: ["files"] });
-      queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
-      queryClient.invalidateQueries({ queryKey: ["folders"] });
-      queryClient.invalidateQueries({ queryKey: ["rootFolders"] });
-
-      // Invalidate specific folder queries (for nested folders)
-      queryClient.invalidateQueries({ queryKey: ["files", null] });
-      queryClient.invalidateQueries({ queryKey: ["files", undefined] });
-      queryClient.invalidateQueries({ queryKey: ["folders", null] });
-      queryClient.invalidateQueries({ queryKey: ["folders", undefined] });
-
-      // Force refetch of all data
-      queryClient.refetchQueries({ queryKey: ["files"] });
-      queryClient.refetchQueries({ queryKey: ["folders"] });
-      queryClient.refetchQueries({ queryKey: ["rootFiles"] });
-      queryClient.refetchQueries({ queryKey: ["rootFolders"] });
-
-      // Also invalidate all queries to be safe
-      queryClient.invalidateQueries();
-
-      // Add a small delay to ensure backend has processed the upload
-      setTimeout(() => {
-        console.log("🔄 [Delayed] Refetching queries after upload...");
-        queryClient.refetchQueries({ queryKey: ["files"] });
-        queryClient.refetchQueries({ queryKey: ["folders"] });
-        queryClient.refetchQueries({ queryKey: ["rootFiles"] });
-        queryClient.refetchQueries({ queryKey: ["rootFolders"] });
-      }, 1000);
-
-      console.log("✅ All queries invalidated and refetched");
-      // Toast deferred until stamp preference is chosen in UploadModal
+      // List refresh deferred until stamp confirmation in UploadModal
     },
     onError: (error: any) => {
       console.error("❌ FOLDER UPLOAD ERROR:", error);
-      console.error("❌ Error details:", error.message);
-      console.error("❌ Error response:", error.response?.data);
-      console.error("❌ Error status:", error.response?.status);
       toast.error(error.response?.data?.message || "Failed to upload folder");
     },
   });
