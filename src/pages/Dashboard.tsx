@@ -7,6 +7,8 @@ import {
   FiMenu,
   FiArchive,
   FiActivity,
+  FiSearch,
+  FiX,
   // FiStar,
   FiTrash2,
 } from "react-icons/fi";
@@ -38,7 +40,8 @@ const Dashboard: React.FC = () => {
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  // const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isGlobalSearch, setIsGlobalSearch] = useState(false);
   const [activeView, setActiveView] = useState("dashboard");
   const [permissionResource, setPermissionResource] = useState<{
     id: number;
@@ -264,6 +267,12 @@ const Dashboard: React.FC = () => {
       // Reset selected folder when switching views
       setSelectedFolderId(null);
       setSelectedFolderName(null);
+      setNavigationHistory([]);
+      setNavigationNameHistory([]);
+      if (itemId !== "dashboard") {
+        setSearchQuery("");
+        setIsGlobalSearch(false);
+      }
     }
   };
 
@@ -395,20 +404,53 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* <div className="flex items-center space-x-3">
-              {activeView === "users" && (
+            {activeView === "dashboard" && (
+              <div className="flex items-center gap-2 flex-1 max-w-xl ml-4">
+                <div className="relative flex-1 min-w-0">
+                  <FiSearch
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                    size={16}
+                  />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={
+                      isGlobalSearch
+                        ? "Search all files and folders..."
+                        : "Filter items on this screen..."
+                    }
+                    className="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded-md"
+                      title="Clear search"
+                    >
+                      <FiX size={14} />
+                    </button>
+                  )}
+                </div>
                 <button
-                  onClick={() => {
-                    setEditingUser(null);
-                    setIsUserManagementOpen(true);
-                  }}
-                  className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all transform hover:scale-105"
+                  type="button"
+                  onClick={() => setIsGlobalSearch((v) => !v)}
+                  className={`shrink-0 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                    isGlobalSearch
+                      ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  }`}
+                  title={
+                    isGlobalSearch
+                      ? "Global search is on — searching everywhere"
+                      : "Turn on to search across all files and folders"
+                  }
                 >
-                  <FiUserPlus size={18} />
-                  <span>Add User</span>
+                  Global Search
                 </button>
-              )}
-            </div> */}
+              </div>
+            )}
           </div>
         </header>
 
@@ -484,7 +526,8 @@ const Dashboard: React.FC = () => {
                   selectedFolderId={selectedFolderId}
                   selectedFolderName={selectedFolderName}
                   selectedFolderPathSegments={selectedFolderPathSegments}
-                  searchQuery=""
+                  searchQuery={searchQuery}
+                  isGlobalSearch={isGlobalSearch}
                   user={user}
                   isUploadModalOpen={isUploadModalOpen}
                   setIsUploadModalOpen={setIsUploadModalOpen}

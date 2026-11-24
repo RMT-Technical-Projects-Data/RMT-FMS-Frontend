@@ -1076,6 +1076,11 @@ const FileList: React.FC<FileListProps> = ({
                   <h4 className="font-semibold text-gray-900 truncate">
                     {file.name}
                   </h4>
+                  {file.folder_name && (
+                    <p className="text-xs text-gray-400 truncate mt-0.5" title={file.folder_name}>
+                      in {file.folder_name}
+                    </p>
+                  )}
                   <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
                     <span>{formatFileSize(file.size || 0)}</span>
                     <span>•</span>

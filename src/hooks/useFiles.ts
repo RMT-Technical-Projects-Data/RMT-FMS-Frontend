@@ -589,12 +589,33 @@ const moveFile = async ({
   return response.data as { message: string };
 };
 
+const searchFilesAndFolders = async (
+  query: string
+): Promise<{ files: File[]; folders: import("../types").Folder[] }> => {
+  const response = await axios.get(`${API_BASE_URL}/files/search`, {
+    params: { q: query },
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+  return response.data as {
+    files: File[];
+    folders: import("../types").Folder[];
+  };
+};
+
 // Hooks
 export const useFiles = (folderId: number | null = null) =>
   useQuery({
     queryKey: ["files", folderId],
     queryFn: () => fetchFiles(folderId),
     enabled: !!localStorage.getItem("token"),
+  });
+
+export const useGlobalSearch = (query: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ["globalSearch", query],
+    queryFn: () => searchFilesAndFolders(query),
+    enabled: enabled && !!localStorage.getItem("token") && query.trim().length > 0,
+    placeholderData: (prev) => prev,
   });
 
 export const useUploadFile = () => {

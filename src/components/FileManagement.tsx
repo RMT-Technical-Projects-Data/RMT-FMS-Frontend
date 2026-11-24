@@ -619,7 +619,12 @@ import {
   useDeleteFolder,
   // useToggleFolderFavourite,
 } from "../hooks/useFolders";
-import { useFiles, useRootFiles, useDownloadFolder } from "../hooks/useFiles";
+import {
+  useFiles,
+  useRootFiles,
+  useDownloadFolder,
+  useGlobalSearch,
+} from "../hooks/useFiles";
 import { useUserPermissions } from "../hooks/usePermissions";
 import type { User, Folder } from "../types";
 
@@ -628,6 +633,7 @@ interface FileManagementProps {
   selectedFolderName?: string | null; // NEW prop - optional folder name passed from Dashboard
   selectedFolderPathSegments?: string[]; // NEW prop - breadcrumb segments passed from Dashboard
   searchQuery: string;
+  isGlobalSearch?: boolean;
   user: User;
   isUploadModalOpen: boolean;
   setIsUploadModalOpen: (open: boolean) => void;
@@ -650,6 +656,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
   selectedFolderName,
   selectedFolderPathSegments,
   searchQuery,
+  isGlobalSearch = false,
   user,
   isUploadModalOpen,
   setIsUploadModalOpen,
@@ -672,6 +679,21 @@ const FileManagement: React.FC<FileManagementProps> = ({
   const downloadFolder = useDownloadFolder();
   // const toggleFolderFavourite = useToggleFolderFavourite();
   const { data: userPermissions } = useUserPermissions();
+
+  // Debounce global search input
+  const [debouncedQuery, setDebouncedQuery] = React.useState(searchQuery);
+  React.useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => window.clearTimeout(t);
+  }, [searchQuery]);
+
+  const usingGlobalSearch =
+    isGlobalSearch && debouncedQuery.trim().length > 0;
+  const {
+    data: globalResults,
+    isLoading: globalLoading,
+    isFetching: globalFetching,
+  } = useGlobalSearch(debouncedQuery.trim(), usingGlobalSearch);
 
   // State for create folder modal
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] =
@@ -813,11 +835,21 @@ const FileManagement: React.FC<FileManagementProps> = ({
   };
 
   // Get the items to display based on whether we're in root or a specific folder
-  const displayFiles = selectedFolderId ? files : rootFiles;
-  const displayFolders = selectedFolderId ? subFolders || [] : rootFolders; // Show subfolders when inside a folder
-  const isLoading = selectedFolderId
-    ? filesLoading || subFoldersLoading
-    : rootFilesLoading || rootFoldersLoading;
+  const displayFiles = usingGlobalSearch
+    ? globalResults?.files || []
+    : selectedFolderId
+      ? files
+      : rootFiles;
+  const displayFolders = usingGlobalSearch
+    ? globalResults?.folders || []
+    : selectedFolderId
+      ? subFolders || []
+      : rootFolders;
+  const isLoading = usingGlobalSearch
+    ? globalLoading || (globalFetching && !globalResults)
+    : selectedFolderId
+      ? filesLoading || subFoldersLoading
+      : rootFilesLoading || rootFoldersLoading;
 
   // Debug: Log files data
   React.useEffect(() => {
@@ -831,15 +863,18 @@ const FileManagement: React.FC<FileManagementProps> = ({
     console.log("🔍 [FileManagement] Root files loading:", rootFilesLoading);
   }, [displayFiles, selectedFolderId, selectedFolderName, filesLoading, rootFilesLoading]);
 
-  const filteredFiles =
-    displayFiles?.filter((file) =>
-      file.name.toLowerCase().includes(searchQuery.toLowerCase())
-    ) || [];
+  const q = searchQuery.toLowerCase().trim();
+  const filteredFiles = usingGlobalSearch
+    ? displayFiles || []
+    : displayFiles?.filter((file) =>
+        !q || file.name.toLowerCase().includes(q)
+      ) || [];
 
-  const filteredFolders =
-    displayFolders?.filter((folder) =>
-      folder.name.toLowerCase().includes(searchQuery.toLowerCase())
-    ) || [];
+  const filteredFolders = usingGlobalSearch
+    ? displayFolders || []
+    : displayFolders?.filter((folder) =>
+        !q || folder.name.toLowerCase().includes(q)
+      ) || [];
 
   // Calculate total size for display
   const totalSize = filteredFiles.reduce(
@@ -906,9 +941,11 @@ const FileManagement: React.FC<FileManagementProps> = ({
             )}
             <div>
               <h2 className="text-xl font-bold text-gray-900" title="">
-                {selectedFolderId
-                  ? "Folder Contents"
-                  : "Dashboard - All Files & Folders"}
+                {usingGlobalSearch
+                  ? `Search results for “${debouncedQuery.trim()}”`
+                  : selectedFolderId
+                    ? "Folder Contents"
+                    : "Dashboard - All Files & Folders"}
               </h2>
               {selectedFolderId && (
                 <div className="mt-1 text-sm text-gray-700 font-semibold flex items-center flex-wrap gap-1">
@@ -931,8 +968,15 @@ const FileManagement: React.FC<FileManagementProps> = ({
               )}
               <p className="text-gray-500 mt-1">
                 {totalItems} items
-                {selectedFolderId && totalSize > 0 && ` • ${(totalSize / (1024 * 1024)).toFixed(2)} MBs`}
-                {selectedFolderId && (
+                {usingGlobalSearch && " • across all folders"}
+                {!usingGlobalSearch &&
+                  !isGlobalSearch &&
+                  q &&
+                  " • filtered on this screen"}
+                {selectedFolderId &&
+                  totalSize > 0 &&
+                  ` • ${(totalSize / (1024 * 1024)).toFixed(2)} MBs`}
+                {selectedFolderId && !usingGlobalSearch && (
                   <button
                     onClick={handleBackToRoot}
                     className="ml-4 text-blue-600 text-sm font-medium hover:text-blue-600 hover:no-underline transition-none"
@@ -1125,14 +1169,20 @@ const FileManagement: React.FC<FileManagementProps> = ({
                   <FiFile className="text-gray-400" size={32} />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  {selectedFolderId
-                    ? "This folder is empty"
-                    : "No files or folders yet"}
+                  {usingGlobalSearch || q
+                    ? "No matching files or folders"
+                    : selectedFolderId
+                      ? "This folder is empty"
+                      : "No files or folders yet"}
                 </h3>
                 <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                  {selectedFolderId
-                    ? "Upload files to this folder or create subfolders to organize your content."
-                    : "Get started by uploading your first file or creating a new folder."}
+                  {usingGlobalSearch || q
+                    ? isGlobalSearch
+                      ? "Try a different search term, or turn off Global Search to filter only this screen."
+                      : "No items on this screen match your filter."
+                    : selectedFolderId
+                      ? "Upload files to this folder or create subfolders to organize your content."
+                      : "Get started by uploading your first file or creating a new folder."}
                 </p>
                 {user.role === "super_admin" && (
                   <div className="flex justify-center space-x-4">
