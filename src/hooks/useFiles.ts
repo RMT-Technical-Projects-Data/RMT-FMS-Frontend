@@ -894,6 +894,9 @@ export const useRestoreFile = () => {
       queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
       queryClient.invalidateQueries({ queryKey: ["favouriteFiles"] });
       queryClient.invalidateQueries({ queryKey: ["trashFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["folders"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFolders"] });
+      queryClient.invalidateQueries({ queryKey: ["trashFolders"] });
       toast.success("File restored successfully!");
     },
     onError: (error: any) => {
