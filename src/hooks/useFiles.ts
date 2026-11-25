@@ -178,9 +178,12 @@ const uploadFolder = async ({
   }
 };
 
-const downloadFile = async (id: number, fileName?: string): Promise<void> => {
-  console.log(`📥 Downloading file ${id}...`);
-  console.log(`📥 Download URL: ${API_BASE_URL}/files/${id}/download`);
+const downloadFile = async (
+  id: number,
+  fileName?: string,
+  withStamp: boolean = true
+): Promise<void> => {
+  console.log(`📥 Downloading file ${id}... stamp=${withStamp}`);
 
   // Validate file ID
   if (!id || isNaN(id)) {
@@ -189,8 +192,10 @@ const downloadFile = async (id: number, fileName?: string): Promise<void> => {
 
   try {
     // Use the correct backend endpoint: /files/download/{id}
-    console.log(`📥 Downloading from: ${API_BASE_URL}/files/download/${id}`);
-    const response = await axios.get(`${API_BASE_URL}/files/download/${id}`, {
+    const url = `${API_BASE_URL}/files/download/${id}`;
+    console.log(`📥 Downloading from: ${url}`);
+    const response = await axios.get(url, {
+      params: { stamp: withStamp ? "1" : "0" },
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       responseType: "blob",
     });
@@ -274,11 +279,15 @@ const downloadFile = async (id: number, fileName?: string): Promise<void> => {
   }
 };
 
-const downloadFolder = async (id: number): Promise<void> => {
-  console.log(`📥 Downloading folder ${id}...`);
+const downloadFolder = async (
+  id: number,
+  withStamp: boolean = true
+): Promise<void> => {
+  console.log(`📥 Downloading folder ${id}... stamp=${withStamp}`);
 
   try {
     const response = await axios.get(`${API_BASE_URL}/folders/${id}/download`, {
+      params: { stamp: withStamp ? "1" : "0" },
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       responseType: "blob",
     });
@@ -671,8 +680,15 @@ export const useUploadFolder = () => {
 
 export const useDownloadFile = () =>
   useMutation({
-    mutationFn: ({ id, fileName }: { id: number; fileName?: string }) =>
-      downloadFile(id, fileName),
+    mutationFn: ({
+      id,
+      fileName,
+      withStamp = true,
+    }: {
+      id: number;
+      fileName?: string;
+      withStamp?: boolean;
+    }) => downloadFile(id, fileName, withStamp),
     onSuccess: () => {
       toast.success("File downloaded successfully!");
     },
@@ -684,7 +700,13 @@ export const useDownloadFile = () =>
 
 export const useDownloadFolder = () =>
   useMutation({
-    mutationFn: downloadFolder,
+    mutationFn: ({
+      id,
+      withStamp = true,
+    }: {
+      id: number;
+      withStamp?: boolean;
+    }) => downloadFolder(id, withStamp),
     onSuccess: () => {
       toast.success("Folder downloaded successfully!");
     },

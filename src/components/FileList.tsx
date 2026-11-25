@@ -567,6 +567,7 @@ import {
 import MoveFileModal from "./MoveFileModal";
 import ConfirmModal, { type ConfirmTone } from "./ConfirmModal";
 import PromptModal from "./PromptModal";
+import StampChoiceModal from "./StampChoiceModal";
 
 type FileConfirmAction =
   | "delete"
@@ -630,6 +631,11 @@ const FileList: React.FC<FileListProps> = ({
     name: string;
     action: FileConfirmAction;
   } | null>(null);
+  const [downloadTarget, setDownloadTarget] = React.useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [isDownloading, setIsDownloading] = React.useState(false);
 
   // Super Admin discreet upload-date edit (5 rapid clicks on the date)
   const dateClickRef = React.useRef<{ fileId: number | null; count: number; timer: ReturnType<typeof setTimeout> | null }>({
@@ -715,53 +721,38 @@ const FileList: React.FC<FileListProps> = ({
     return false;
   };
 
-  const handleDownload = async (file: File) => {
+  const requestDownload = (file: File) => {
+    if (!file.id || isNaN(file.id)) return;
+    setDownloadTarget({ id: file.id, name: file.name });
+  };
+
+  const performDownload = async (withStamp: boolean) => {
+    if (!downloadTarget) return;
+    const { id, name } = downloadTarget;
+
     try {
-      console.log(
-        `🖱️ Download button clicked - ID: ${file.id}, Name: ${file.name}`
-      );
-
-      // Validate file ID
-      if (!file.id || isNaN(file.id)) {
-        console.error("Invalid file ID:", file.id);
-        return;
-      }
-
-      // Check if file exists in the current files list
-      const fileExists = files.find((f) => f.id === file.id);
-      if (!fileExists) {
-        console.error(
-          `File with ID ${file.id} not found in current files list`
-        );
-        return;
-      }
-
+      setIsDownloading(true);
       const token = localStorage.getItem("token");
       if (!token) {
-        console.error("No token found");
+        toast.error("Please sign in again");
         return;
       }
 
-      // Use configured API base (stamped PDF + audit logging happen server-side)
-      const fileUrl = `${API_BASE_URL}/files/download/${file.id}`;
-      console.log(`📥 Downloading from: ${fileUrl}`);
-
+      const fileUrl = `${API_BASE_URL}/files/download/${id}?stamp=${
+        withStamp ? "1" : "0"
+      }`;
       const response = await fetch(fileUrl, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
-        console.error("Failed to download file");
         toast.error("Failed to download file");
         return;
       }
 
-      // Get filename from headers or fallback
       const disposition = response.headers.get("content-disposition");
-      let filename = file.name;
+      let filename = name;
       if (disposition && disposition.includes("filename=")) {
         filename = disposition
           .split("filename=")[1]
@@ -769,21 +760,22 @@ const FileList: React.FC<FileListProps> = ({
           .trim();
       }
 
-      // Convert to blob and trigger download
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
-
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = filename; // ✅ triggers direct download
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-
-      // Cleanup blob URL
       window.URL.revokeObjectURL(blobUrl);
+      setDownloadTarget(null);
+      toast.success("File downloaded successfully!");
     } catch (error) {
       console.error("Error downloading file:", error);
+      toast.error("Failed to download file");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -1174,7 +1166,7 @@ const FileList: React.FC<FileListProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDownload(file);
+                        requestDownload(file);
                       }}
                       className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors"
                       title="Download"
@@ -1359,6 +1351,18 @@ const FileList: React.FC<FileListProps> = ({
         }
         onClose={() => setConfirmTarget(null)}
         onConfirm={handleConfirmAction}
+      />
+
+      <StampChoiceModal
+        isOpen={!!downloadTarget}
+        title="Download File"
+        itemName={downloadTarget?.name}
+        isLoading={isDownloading}
+        onClose={() => {
+          if (!isDownloading) setDownloadTarget(null);
+        }}
+        onWithoutStamp={() => performDownload(false)}
+        onWithStamp={() => performDownload(true)}
       />
     </div>
   );

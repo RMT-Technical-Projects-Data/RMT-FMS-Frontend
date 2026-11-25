@@ -611,6 +611,7 @@ import PermissionModal from "./PermissionModal";
 import CreateFolderModal from "../components/CreateFolderModal"; // New import
 import ConfirmModal from "./ConfirmModal";
 import PromptModal from "./PromptModal";
+import StampChoiceModal from "./StampChoiceModal";
 import {
   useCreateFolder,
   useRootFolders,
@@ -903,8 +904,13 @@ const FileManagement: React.FC<FileManagementProps> = ({
     setOpenDropdownId(openDropdownId === folderId ? null : folderId);
   };
 
-  const handleDownloadFolder = (folderId: number) => {
-    downloadFolder.mutate(folderId);
+  const [downloadFolderTarget, setDownloadFolderTarget] = React.useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+
+  const handleDownloadFolder = (folderId: number, folderName: string) => {
+    setDownloadFolderTarget({ id: folderId, name: folderName });
     setOpenDropdownId(null);
   };
 
@@ -1097,7 +1103,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleDownloadFolder(folder.id);
+                                      handleDownloadFolder(folder.id, folder.name);
                                     }}
                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                   >
@@ -1271,6 +1277,30 @@ const FileManagement: React.FC<FileManagementProps> = ({
           deleteFolder.mutate(deleteFolderTarget.id, {
             onSettled: () => setDeleteFolderTarget(null),
           });
+        }}
+      />
+
+      <StampChoiceModal
+        isOpen={!!downloadFolderTarget}
+        title="Download Folder"
+        itemName={downloadFolderTarget?.name}
+        isLoading={downloadFolder.isPending}
+        onClose={() => {
+          if (!downloadFolder.isPending) setDownloadFolderTarget(null);
+        }}
+        onWithoutStamp={() => {
+          if (!downloadFolderTarget) return;
+          downloadFolder.mutate(
+            { id: downloadFolderTarget.id, withStamp: false },
+            { onSettled: () => setDownloadFolderTarget(null) }
+          );
+        }}
+        onWithStamp={() => {
+          if (!downloadFolderTarget) return;
+          downloadFolder.mutate(
+            { id: downloadFolderTarget.id, withStamp: true },
+            { onSettled: () => setDownloadFolderTarget(null) }
+          );
         }}
       />
     </>
