@@ -192,9 +192,9 @@ const downloadFile = async (
 
   try {
     // Use the correct backend endpoint: /files/download/{id}
-    const url = `${API_BASE_URL}/files/download/${id}`;
-    console.log(`📥 Downloading from: ${url}`);
-    const response = await axios.get(url, {
+    const downloadUrl = `${API_BASE_URL}/files/download/${id}`;
+    console.log(`📥 Downloading from: ${downloadUrl}`);
+    const response = await axios.get(downloadUrl, {
       params: { stamp: withStamp ? "1" : "0" },
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       responseType: "blob",
@@ -244,9 +244,9 @@ const downloadFile = async (
 
     // Create blob with correct MIME type
     const blob = new Blob([response.data], { type: contentType });
-    const url = window.URL.createObjectURL(blob);
+    const blobUrl = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
+    link.href = blobUrl;
     link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
@@ -254,7 +254,7 @@ const downloadFile = async (
     // Clean up after a short delay
     setTimeout(() => {
       link.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blobUrl);
     }, 100);
 
     console.log("✅ Download completed:", filename);
