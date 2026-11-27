@@ -967,17 +967,10 @@ const FileList: React.FC<FileListProps> = ({
       return;
     }
     if (action === "restore") {
-      restoreFile.mutate(id, {
-        onError: () => toast.error("Failed to restore file. Please try again."),
-        onSettled: close,
-      });
+      restoreFile.mutate(id, { onSettled: close });
       return;
     }
-    permanentDeleteFile.mutate(id, {
-      onError: () =>
-        toast.error("Failed to permanently delete file. Please try again."),
-      onSettled: close,
-    });
+    permanentDeleteFile.mutate(id, { onSettled: close });
   };
 
   const formatFileSize = (bytes: number) => {

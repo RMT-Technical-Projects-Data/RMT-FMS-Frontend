@@ -360,7 +360,6 @@ import {
 } from "react-icons/fi";
 import FileList from "./FileList";
 import ConfirmModal from "./ConfirmModal";
-import { toast } from "react-toastify";
 import { useTrashFilesByFolder, useBulkPermanentDeleteFiles } from "../hooks/useFiles";
 import { useTrashFoldersByParent, useRestoreFolder, usePermanentDeleteFolder } from "../hooks/useFolders";
 // import { useUserPermissions } from "../hooks/usePermissions";
@@ -491,11 +490,6 @@ const TrashView: React.FC<TrashViewProps> = ({
       bulkPermanentDeleteFiles.mutate(selectedFileIds, {
         onSuccess: () => {
           setSelectedFileIds([]);
-          console.log("✅ Bulk file delete successful");
-        },
-        onError: (error: any) => {
-          console.error("❌ Bulk file delete failed:", error);
-          toast.error("Bulk file delete failed");
         },
       });
     }
@@ -503,12 +497,7 @@ const TrashView: React.FC<TrashViewProps> = ({
     // Delete Folders (Iterative - since we don't have a bulk folder hook yet)
     if (selectedFolderIds.length > 0) {
       selectedFolderIds.forEach((id) => {
-        permanentDeleteFolder.mutate(id, {
-          onError: (error: any) => {
-            console.error(`❌ Failed to delete folder ${id}`, error);
-            toast.error("Failed to delete folder");
-          },
-        });
+        permanentDeleteFolder.mutate(id);
       });
       setSelectedFolderIds([]);
     }
@@ -532,8 +521,6 @@ const TrashView: React.FC<TrashViewProps> = ({
 
     if (confirmState.type === "deleteFolder" && confirmState.id != null) {
       permanentDeleteFolder.mutate(confirmState.id, {
-        onError: () =>
-          toast.error("Failed to permanently delete folder. Please try again."),
         onSettled: () => setConfirmState(null),
       });
       return;

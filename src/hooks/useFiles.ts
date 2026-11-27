@@ -938,7 +938,11 @@ export const useRestoreFile = () => {
       toast.success("File restored successfully!");
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to restore file");
+      toast.error(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to restore file"
+      );
     },
   });
 };

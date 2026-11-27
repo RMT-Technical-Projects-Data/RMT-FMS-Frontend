@@ -300,9 +300,8 @@ const UploadModal: React.FC<UploadModalProps> = ({
       },
       {
         onSuccess: goToStampStep,
-        onError: (error: any) => {
+        onError: () => {
           setUploadProgress(null);
-          toast.error(error.message || "Upload failed");
         },
       }
     );
@@ -434,9 +433,8 @@ const UploadModal: React.FC<UploadModalProps> = ({
       { formData, onProgress: setUploadProgress },
       {
         onSuccess: goToStampStep,
-        onError: (error: any) => {
+        onError: () => {
           setUploadProgress(null);
-          toast.error(error.message || "Upload failed");
         },
       }
     );
