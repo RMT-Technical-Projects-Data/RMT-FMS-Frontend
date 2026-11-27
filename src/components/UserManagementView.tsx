@@ -2,16 +2,9 @@ import React, { useMemo, useState } from "react";
 import { FiTrash2, FiUserPlus, FiX } from "react-icons/fi";
 import UserManagement from "./UserManagement";
 import { useUsers, useDeleteUser } from "../hooks/useAuth";
-import type { User, ViewMode } from "../types";
+import type { User } from "../types";
 import DataTable, { type DataColumn } from "./DataTable";
-import {
-  Card,
-  CompactRow,
-  Count,
-  SearchBox,
-  Toolbar,
-  ViewSwitch,
-} from "./ui";
+import { Count, SearchBox, Toolbar } from "./ui";
 
 interface UserManagementViewProps {
   user: User;
@@ -44,7 +37,6 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
     username: string;
   } | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<ViewMode>("list");
 
   const handleDeleteUser = (userId: number, username: string) => {
     setUserToDelete({ id: userId, username });
@@ -156,63 +148,6 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
         Loading users…
       </div>
     );
-  } else if (view === "grid" || view === "compact") {
-    body = (
-      <div className="flex flex-col gap-3">
-        {view === "grid" ? (
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
-            {filtered.map((r, i) => (
-              <Card
-                key={r.id}
-                index={i + 1}
-                title={r.username}
-                tag={roleTag(r.role)}
-                lines={[["Role", r.role?.replace(/_/g, " ")]]}
-                footer={
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleEditUser(r)}
-                      className="text-brand-dark hover:underline"
-                    >
-                      Edit
-                    </button>
-                    {r.id !== user.id && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteUser(r.id, r.username)}
-                        className="text-[#b42318] hover:underline"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                }
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white border border-rule rounded-lg overflow-hidden">
-            <ul className="divide-y divide-[#eeeae1]">
-              {filtered.map((r, i) => (
-                <CompactRow
-                  key={r.id}
-                  index={i + 1}
-                  title={r.username}
-                  tag={roleTag(r.role)}
-                  lines={[["Role", r.role?.replace(/_/g, " ")]]}
-                />
-              ))}
-            </ul>
-          </div>
-        )}
-        {!filtered.length && (
-          <p className="bg-white border border-rule rounded-lg py-12 text-center text-sm text-muted">
-            No users found.
-          </p>
-        )}
-      </div>
-    );
   } else {
     body = (
       <DataTable
@@ -229,17 +164,14 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
       <div className="flex flex-col gap-5 min-w-0">
         <Toolbar
           actions={
-            <>
-              <ViewSwitch value={view} onChange={setView} />
-              <button
-                type="button"
-                onClick={handleAddUser}
-                className="h-8 px-3 rounded-md bg-ink text-white text-[13px] font-medium inline-flex items-center gap-1.5 hover:bg-ink-soft"
-              >
-                <FiUserPlus size={14} />
-                Add User
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={handleAddUser}
+              className="h-8 px-3 rounded-md bg-ink text-white text-[13px] font-medium inline-flex items-center gap-1.5 hover:bg-ink-soft"
+            >
+              <FiUserPlus size={14} />
+              Add User
+            </button>
           }
         >
           <SearchBox

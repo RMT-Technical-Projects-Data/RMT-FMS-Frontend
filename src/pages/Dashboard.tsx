@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   FiHome,
   FiUsers,
@@ -8,6 +8,7 @@ import {
   FiArchive,
   FiActivity,
   FiTrash2,
+  FiSettings,
 } from "react-icons/fi";
 import ReviveMedicalTechLogo from "/ReviveMedicalTech.png";
 import FileManagement from "../components/FileManagement";
@@ -15,6 +16,7 @@ import UserManagementView from "../components/UserManagementView";
 import TrashView from "../components/TrashView";
 import ArchiveView from "../components/ArchiveView";
 import AuditLogsView from "../components/AuditLogsView";
+import SettingsModal from "../components/SettingsModal";
 import type { User } from "../types";
 
 const DASHBOARD_STATE_KEY = "edms_dashboard_nav";
@@ -26,6 +28,14 @@ type SavedDashboardState = {
   navigationHistory?: number[];
   navigationNameHistory?: (string | null)[];
   isGlobalSearch?: boolean;
+};
+
+type NavState = {
+  activeView: string;
+  selectedFolderId: number | null;
+  selectedFolderName: string | null;
+  navigationHistory: number[];
+  navigationNameHistory: (string | null)[];
 };
 
 const readSavedDashboardState = (): SavedDashboardState => {
@@ -86,9 +96,74 @@ const Dashboard: React.FC = () => {
     type: "folder" | "file";
   } | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
+  const seededHistoryRef = useRef(false);
+
+  const currentNavState = useCallback(
+    (): NavState => ({
+      activeView,
+      selectedFolderId,
+      selectedFolderName,
+      navigationHistory,
+      navigationNameHistory,
+    }),
+    [
+      activeView,
+      selectedFolderId,
+      selectedFolderName,
+      navigationHistory,
+      navigationNameHistory,
+    ]
+  );
+
+  const applyNavState = useCallback((s: NavState) => {
+    setActiveView(s.activeView || "dashboard");
+    setSelectedFolderId(
+      typeof s.selectedFolderId === "number" ? s.selectedFolderId : null
+    );
+    setSelectedFolderName(
+      typeof s.selectedFolderName === "string" ? s.selectedFolderName : null
+    );
+    setNavigationHistory(
+      Array.isArray(s.navigationHistory) ? s.navigationHistory : []
+    );
+    setNavigationNameHistory(
+      Array.isArray(s.navigationNameHistory) ? s.navigationNameHistory : []
+    );
+  }, []);
+
+  const pushNav = useCallback(
+    (patch: Partial<NavState>, replace = false) => {
+      const next: NavState = { ...currentNavState(), ...patch };
+      applyNavState(next);
+      navigate("/dashboard", { state: next, replace });
+    },
+    [applyNavState, currentNavState, navigate]
+  );
+
+  // Seed history entry so first browser Back stays inside the app
+  useEffect(() => {
+    if (seededHistoryRef.current) return;
+    seededHistoryRef.current = true;
+    const existing = location.state as NavState | null;
+    if (existing && typeof existing.activeView === "string") {
+      applyNavState(existing);
+      return;
+    }
+    navigate("/dashboard", { replace: true, state: currentNavState() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Browser back / forward
+  useEffect(() => {
+    const s = location.state as NavState | null;
+    if (!s || typeof s.activeView !== "string") return;
+    applyNavState(s);
+  }, [location.key, location.state, applyNavState]);
 
   useEffect(() => {
     // Non–super-admins shouldn't land on admin-only views after reload
@@ -96,9 +171,18 @@ const Dashboard: React.FC = () => {
       user.role !== "super_admin" &&
       ["audit", "trash", "users"].includes(activeView)
     ) {
-      setActiveView("dashboard");
+      pushNav(
+        {
+          activeView: "dashboard",
+          selectedFolderId: null,
+          selectedFolderName: null,
+          navigationHistory: [],
+          navigationNameHistory: [],
+        },
+        true
+      );
     }
-  }, [user.role, activeView]);
+  }, [user.role, activeView, pushNav]);
 
   useEffect(() => {
     try {
@@ -175,17 +259,27 @@ const Dashboard: React.FC = () => {
     folderName?: string | null
   ) => {
     if (folderId === null) {
-      setSelectedFolderId(null);
-      setSelectedFolderName(null);
-      setNavigationHistory([]);
-      setNavigationNameHistory([]);
+      pushNav({
+        selectedFolderId: null,
+        selectedFolderName: null,
+        navigationHistory: [],
+        navigationNameHistory: [],
+      });
     } else {
-      if (selectedFolderId !== null) {
-        setNavigationHistory((prev) => [...prev, selectedFolderId]);
-        setNavigationNameHistory((prev) => [...prev, selectedFolderName]);
-      }
-      setSelectedFolderId(folderId);
-      setSelectedFolderName(folderName ?? null);
+      const nextHistory =
+        selectedFolderId !== null
+          ? [...navigationHistory, selectedFolderId]
+          : navigationHistory;
+      const nextNames =
+        selectedFolderId !== null
+          ? [...navigationNameHistory, selectedFolderName]
+          : navigationNameHistory;
+      pushNav({
+        selectedFolderId: folderId,
+        selectedFolderName: folderName ?? null,
+        navigationHistory: nextHistory,
+        navigationNameHistory: nextNames,
+      });
     }
   };
 
@@ -194,13 +288,19 @@ const Dashboard: React.FC = () => {
       const previousFolderId = navigationHistory[navigationHistory.length - 1];
       const previousFolderName =
         navigationNameHistory[navigationNameHistory.length - 1] ?? null;
-      setNavigationHistory((prev) => prev.slice(0, -1));
-      setNavigationNameHistory((prev) => prev.slice(0, -1));
-      setSelectedFolderId(previousFolderId);
-      setSelectedFolderName(previousFolderName);
+      pushNav({
+        selectedFolderId: previousFolderId,
+        selectedFolderName: previousFolderName,
+        navigationHistory: navigationHistory.slice(0, -1),
+        navigationNameHistory: navigationNameHistory.slice(0, -1),
+      });
     } else {
-      setSelectedFolderId(null);
-      setSelectedFolderName(null);
+      pushNav({
+        selectedFolderId: null,
+        selectedFolderName: null,
+        navigationHistory: [],
+        navigationNameHistory: [],
+      });
     }
   };
 
@@ -215,14 +315,12 @@ const Dashboard: React.FC = () => {
     );
     const targetHistoryIdx = index - 1;
     if (targetHistoryIdx < historyNames.length) {
-      const newHistIds = navigationHistory.slice(0, targetHistoryIdx);
-      const newHistNames = navigationNameHistory.slice(0, targetHistoryIdx);
-      const targetId = navigationHistory[targetHistoryIdx];
-      const targetName = navigationNameHistory[targetHistoryIdx];
-      setNavigationHistory(newHistIds);
-      setNavigationNameHistory(newHistNames);
-      setSelectedFolderId(targetId);
-      setSelectedFolderName(targetName);
+      pushNav({
+        navigationHistory: navigationHistory.slice(0, targetHistoryIdx),
+        navigationNameHistory: navigationNameHistory.slice(0, targetHistoryIdx),
+        selectedFolderId: navigationHistory[targetHistoryIdx],
+        selectedFolderName: navigationNameHistory[targetHistoryIdx],
+      });
     }
   };
 
@@ -230,7 +328,7 @@ const Dashboard: React.FC = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem(DASHBOARD_STATE_KEY);
-    navigate("/login");
+    navigate("/login", { replace: true });
   };
 
   const selectedFolderPathSegments = useMemo(() => {
@@ -259,15 +357,17 @@ const Dashboard: React.FC = () => {
   }
 
   const handleNavigationClick = (itemId: string) => {
-    setActiveView(itemId);
-    setSelectedFolderId(null);
-    setSelectedFolderName(null);
-    setNavigationHistory([]);
-    setNavigationNameHistory([]);
     if (itemId !== "dashboard") {
       setSearchQuery("");
       setIsGlobalSearch(false);
     }
+    pushNav({
+      activeView: itemId,
+      selectedFolderId: null,
+      selectedFolderName: null,
+      navigationHistory: [],
+      navigationNameHistory: [],
+    });
   };
 
   const pageTitle =
@@ -400,6 +500,21 @@ const Dashboard: React.FC = () => {
               </span>
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className={rowClass(false)}
+            title={narrow ? "Settings" : undefined}
+          >
+            <FiSettings size={15} className="shrink-0" />
+            <span
+              className={`truncate flex-1 text-left ${
+                narrow ? "md:sr-only" : ""
+              }`}
+            >
+              Settings
+            </span>
+          </button>
           <button
             type="button"
             onClick={handleLogout}
@@ -565,6 +680,11 @@ const Dashboard: React.FC = () => {
           )}
         </main>
       </div>
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 };

@@ -873,18 +873,56 @@ const FileManagement: React.FC<FileManagementProps> = ({
     console.log("🔍 [FileManagement] Root files loading:", rootFilesLoading);
   }, [displayFiles, selectedFolderId, selectedFolderName, filesLoading, rootFilesLoading]);
 
-  const q = searchQuery.toLowerCase().trim();
-  const filteredFiles = usingGlobalSearch
-    ? displayFiles || []
-    : displayFiles?.filter((file) =>
-        !q || file.name.toLowerCase().includes(q)
-      ) || [];
+  type SortMode = "newest" | "oldest" | "name_asc" | "name_desc";
+  const [sortMode, setSortMode] = React.useState<SortMode>(() => {
+    const saved = localStorage.getItem("edms_library_sort");
+    return saved === "oldest" ||
+      saved === "name_asc" ||
+      saved === "name_desc" ||
+      saved === "newest"
+      ? saved
+      : "newest";
+  });
 
-  const filteredFolders = usingGlobalSearch
-    ? displayFolders || []
-    : displayFolders?.filter((folder) =>
-        !q || folder.name.toLowerCase().includes(q)
-      ) || [];
+  React.useEffect(() => {
+    localStorage.setItem("edms_library_sort", sortMode);
+  }, [sortMode]);
+
+  const sortByMode = <T extends { name?: string; created_at?: string }>(
+    items: T[]
+  ): T[] => {
+    const copy = [...items];
+    copy.sort((a, b) => {
+      if (sortMode === "name_asc" || sortMode === "name_desc") {
+        const cmp = String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+          sensitivity: "base",
+          numeric: true,
+        });
+        return sortMode === "name_asc" ? cmp : -cmp;
+      }
+      const at = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return sortMode === "oldest" ? at - bt : bt - at;
+    });
+    return copy;
+  };
+
+  const q = searchQuery.toLowerCase().trim();
+  const filteredFiles = sortByMode(
+    usingGlobalSearch
+      ? displayFiles || []
+      : displayFiles?.filter(
+          (file) => !q || file.name.toLowerCase().includes(q)
+        ) || []
+  );
+
+  const filteredFolders = sortByMode(
+    usingGlobalSearch
+      ? displayFolders || []
+      : displayFolders?.filter(
+          (folder) => !q || folder.name.toLowerCase().includes(q)
+        ) || []
+  );
 
   const handleRenameFolder = (folderId: number, currentName: string) => {
     setRenameFolderTarget({ id: folderId, name: currentName });
@@ -974,6 +1012,18 @@ const FileManagement: React.FC<FileManagementProps> = ({
             </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+              className="h-9 rounded-md border border-rule bg-white px-2.5 text-[13px] text-ink focus:outline-none focus:border-brand-dark"
+              aria-label="Sort folders and files"
+              title="Sort folders and files"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name_asc">Name A–Z</option>
+              <option value="name_desc">Name Z–A</option>
+            </select>
             {user.role === "super_admin" && (
               <button
                 onClick={handleCreateFolder}

@@ -10,10 +10,12 @@ import { API_BASE_URL } from "../config";
 interface LoginCredentials {
   username: string;
   password: string;
+  sessionMinutes?: number;
 }
 interface LoginResponse {
   token: string;
   user: User;
+  sessionMinutes?: number;
 }
 
 export const useLogin = () => {

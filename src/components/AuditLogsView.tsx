@@ -1,16 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FiAlertCircle, FiRefreshCw } from "react-icons/fi";
 import { useActivityAuditLogs } from "../hooks/useFiles";
-import type { ActivityAuditLog, User, ViewMode } from "../types";
-import DataTable, { ServerPager, type DataColumn } from "./DataTable";
-import {
-  Card,
-  CompactRow,
-  Count,
-  SearchBox,
-  Toolbar,
-  ViewSwitch,
-} from "./ui";
+import type { ActivityAuditLog, User } from "../types";
+import DataTable, { type DataColumn } from "./DataTable";
+import { Count, SearchBox, Toolbar } from "./ui";
 
 interface AuditLogsViewProps {
   user: User;
@@ -77,16 +70,6 @@ const AuditLogsView: React.FC<AuditLogsViewProps> = ({ user }) => {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
-  const [view, setView] = useState<ViewMode>(() => {
-    const saved = localStorage.getItem("edms_audit_view");
-    return saved === "grid" || saved === "compact" || saved === "list"
-      ? saved
-      : "list";
-  });
-
-  useEffect(() => {
-    localStorage.setItem("edms_audit_view", view);
-  }, [view]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -229,18 +212,6 @@ const AuditLogsView: React.FC<AuditLogsViewProps> = ({ user }) => {
     },
   };
 
-  const itemFor = (r: ActivityAuditLog) => ({
-    title: r.username,
-    subtitle: when(r.created_at),
-    tag: actionTag(r),
-    lines: [
-      ["Record", r.resource_name || recordOf(r)],
-      ["Details", r.details || "—"],
-      ["IP", r.ip_address || "—"],
-      ["Status", r.status || "success"],
-    ] as [string, React.ReactNode][],
-  });
-
   let body: React.ReactNode;
   if (isLoading && !logs.length) {
     body = (
@@ -253,40 +224,6 @@ const AuditLogsView: React.FC<AuditLogsViewProps> = ({ user }) => {
       <div className="bg-white border border-rule rounded-lg py-16 text-center text-red-600 flex flex-col items-center gap-2">
         <FiAlertCircle size={22} />
         Failed to load audit logs. Run migrations if this is a new table.
-      </div>
-    );
-  } else if (view === "grid" || view === "compact") {
-    body = (
-      <div className="flex flex-col gap-3">
-        {view === "grid" ? (
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-stretch">
-            {logs.map((r, i) => (
-              <Card
-                key={r.id}
-                index={(page - 1) * pageSize + i + 1}
-                {...itemFor(r)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white border border-rule rounded-lg overflow-hidden">
-            <ul className="divide-y divide-[#eeeae1]">
-              {logs.map((r, i) => (
-                <CompactRow
-                  key={r.id}
-                  index={(page - 1) * pageSize + i + 1}
-                  {...itemFor(r)}
-                />
-              ))}
-            </ul>
-          </div>
-        )}
-        {!logs.length && (
-          <p className="bg-white border border-rule rounded-lg py-12 text-center text-sm text-muted">
-            Nothing to show.
-          </p>
-        )}
-        <ServerPager serverPage={serverPage} />
       </div>
     );
   } else {
@@ -306,20 +243,17 @@ const AuditLogsView: React.FC<AuditLogsViewProps> = ({ user }) => {
     <div className="flex flex-col gap-5 min-w-0">
       <Toolbar
         actions={
-          <>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="h-8 px-3 rounded-md border border-rule bg-white text-[13px] text-ink inline-flex items-center gap-1.5 hover:border-brand-dark"
-            >
-              <FiRefreshCw
-                size={13}
-                className={isFetching ? "animate-spin" : ""}
-              />
-              Refresh
-            </button>
-            <ViewSwitch value={view} onChange={setView} />
-          </>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="h-8 px-3 rounded-md border border-rule bg-white text-[13px] text-ink inline-flex items-center gap-1.5 hover:border-brand-dark"
+          >
+            <FiRefreshCw
+              size={13}
+              className={isFetching ? "animate-spin" : ""}
+            />
+            Refresh
+          </button>
         }
       >
         <SearchBox

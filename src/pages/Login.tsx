@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff, FiUser, FiLock } from "react-icons/fi";
 import { useLogin } from "../hooks/useAuth";
+import { getSessionTimeoutMins } from "../utils/sessionTimeout";
 import Logo from "/ReviveMedicalTech.png";
 
 const LoginPage: React.FC = () => {
@@ -25,7 +26,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setLoginError("");
     login.mutate(
-      { username, password },
+      { username, password, sessionMinutes: getSessionTimeoutMins() },
       {
         onSuccess: (data) => {
           localStorage.setItem("token", data.token);
@@ -35,7 +36,7 @@ const LoginPage: React.FC = () => {
           } else {
             localStorage.removeItem("edms_remember_user");
           }
-          navigate("/dashboard");
+          navigate("/dashboard", { replace: true });
         },
         onError: () => {
           setLoginError("Login failed. Check your username and password.");
