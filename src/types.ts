@@ -60,6 +60,8 @@ export interface ActivityAuditLog {
   details: string | null;
   ip_address: string | null;
   device_ip?: string | null;
+  device_mac?: string | null;
+  device_display?: string | null;
   server_ip?: string | null;
   status: string;
   created_at: string;

@@ -193,18 +193,32 @@ const AuditLogsView: React.FC<AuditLogsViewProps> = ({ user }) => {
       ),
     },
     {
-      key: "device_ip",
-      title: "Device IP",
-      width: 130,
-      sortValue: (r) => r.device_ip || "",
-      render: (r) => (
-        <span
-          className="tabular-nums text-muted"
-          title="Device LAN IP where the browser is running"
-        >
-          {r.device_ip || "—"}
-        </span>
-      ),
+      key: "device",
+      title: "Device",
+      width: 160,
+      sortValue: (r) => r.device_display || r.device_ip || r.device_mac || "",
+      render: (r) => {
+        const ip = r.device_ip || null;
+        const mac = r.device_mac || null;
+        if (!ip && !mac) {
+          return <span className="text-muted">—</span>;
+        }
+        return (
+          <span
+            className="tabular-nums text-muted text-[12px] leading-snug block"
+            title={
+              [ip ? `Device IP: ${ip}` : null, mac ? `MAC / physical: ${mac}` : null]
+                .filter(Boolean)
+                .join(" · ")
+            }
+          >
+            {ip || mac}
+            {ip && mac ? (
+              <span className="block text-[11px] opacity-80">{mac}</span>
+            ) : null}
+          </span>
+        );
+      },
     },
     {
       key: "status",
