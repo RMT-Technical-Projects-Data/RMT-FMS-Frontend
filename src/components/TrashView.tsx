@@ -626,7 +626,7 @@ const TrashView: React.FC<TrashViewProps> = ({
             <div className="p-4 overflow-visible">
               {trashFolders && trashFolders.length > 0 ? (
                 <div className="flex flex-wrap gap-3">
-                  {trashFolders.map((folder) => {
+                  {trashFolders.map((folder, index) => {
                     const daysLeft = calculateRemainingDays(folder.deleted_at);
                     const isSelected = selectedFolderIds.includes(folder.id);
 
@@ -652,8 +652,11 @@ const TrashView: React.FC<TrashViewProps> = ({
                             className="w-4 h-4 rounded border-rule cursor-pointer"
                           />
                         </div>
-                        <span className="h-10 w-10 rounded-lg bg-[#0b1622] text-white flex items-center justify-center shrink-0">
-                          <FiFolder size={18} />
+                        <span className="h-10 w-10 rounded-lg bg-[#0b1622] text-white flex flex-col items-center justify-center shrink-0 gap-0.5">
+                          <span className="text-[10px] font-semibold tabular-nums leading-none opacity-90">
+                            {index + 1}
+                          </span>
+                          <FiFolder size={15} />
                         </span>
                         <div className="min-w-0">
                           <p className="font-semibold text-[14px] text-ink truncate max-w-[120px]">
@@ -724,7 +727,7 @@ const TrashView: React.FC<TrashViewProps> = ({
             <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3]">
               <h3 className="text-[14px] font-semibold text-ink">Files</h3>
             </div>
-            <div className="p-4">
+            <div>
               {trashFiles && trashFiles.length > 0 ? (
                 <FileList
                   files={trashFiles}

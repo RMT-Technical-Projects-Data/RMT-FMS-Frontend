@@ -26,21 +26,24 @@ const StampChoiceModal: React.FC<StampChoiceModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <button
         type="button"
-        className="fixed inset-0 bg-transparent backdrop-blur-md cursor-default"
+        className="fixed inset-0 bg-ink/40 cursor-default"
         aria-label="Close dialog"
         onClick={onClose}
         disabled={isLoading}
       />
-      <div className="relative my-auto bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md max-h-[min(90vh,640px)] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-              <FiDownload className="text-white" size={20} />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+      <div className="relative my-auto bg-white rounded-lg shadow-xl border border-rule w-full max-w-md max-h-[min(90vh,640px)] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-rule shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="h-9 w-9 rounded-md bg-[#0b1622] text-white flex items-center justify-center shrink-0">
+              <FiDownload size={16} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
               {itemName && (
-                <p className="text-sm text-gray-500 truncate max-w-[260px]" title={itemName}>
+                <p
+                  className="text-xs text-muted truncate max-w-[260px]"
+                  title={itemName}
+                >
                   {itemName}
                 </p>
               )}
@@ -50,24 +53,24 @@ const StampChoiceModal: React.FC<StampChoiceModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            className="p-2 hover:bg-[#f3f1ea] rounded-md disabled:opacity-50"
           >
-            <FiX size={20} className="text-gray-500" />
+            <FiX size={18} className="text-muted" />
           </button>
         </div>
 
-        <div className="p-6">
-          <p className="text-sm text-gray-600">
+        <div className="px-5 py-4">
+          <p className="text-sm text-ink">
             Choose whether to include stamps on this download.
           </p>
         </div>
 
-        <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-rule">
           <button
             type="button"
             disabled={isLoading}
             onClick={onClose}
-            className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-50"
+            className="h-9 px-4 rounded-md border border-rule text-[13px] font-medium text-ink disabled:opacity-50"
           >
             Cancel
           </button>
@@ -75,7 +78,7 @@ const StampChoiceModal: React.FC<StampChoiceModalProps> = ({
             type="button"
             disabled={isLoading}
             onClick={onWithoutStamp}
-            className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-50"
+            className="h-9 px-4 rounded-md border border-rule text-[13px] font-medium text-ink hover:border-brand-dark disabled:opacity-50"
           >
             Without Stamp
           </button>
@@ -83,8 +86,11 @@ const StampChoiceModal: React.FC<StampChoiceModalProps> = ({
             type="button"
             disabled={isLoading}
             onClick={onWithStamp}
-            className="px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 font-medium disabled:opacity-50"
+            className="h-9 px-4 rounded-md bg-[#0b1622] text-white text-[13px] font-medium hover:bg-ink-soft disabled:opacity-50 inline-flex items-center gap-2"
           >
+            {isLoading && (
+              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            )}
             {isLoading ? "Downloading…" : "With Stamp"}
           </button>
         </div>

@@ -1,10 +1,10 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { FiEye, FiEyeOff, FiUser, FiLock } from "react-icons/fi";
 import { useLogin } from "../hooks/useAuth";
+import Logo from "/ReviveMedicalTech.png";
 
 const LoginPage: React.FC = () => {
-  const [isLogin] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -12,6 +12,14 @@ const LoginPage: React.FC = () => {
   const [loginError, setLoginError] = useState("");
   const login = useLogin();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const remembered = localStorage.getItem("edms_remember_user");
+    if (remembered) {
+      setUsername(remembered);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,158 +30,166 @@ const LoginPage: React.FC = () => {
         onSuccess: (data) => {
           localStorage.setItem("token", data.token);
           localStorage.setItem("user", JSON.stringify(data.user));
+          if (rememberMe) {
+            localStorage.setItem("edms_remember_user", username);
+          } else {
+            localStorage.removeItem("edms_remember_user");
+          }
           navigate("/dashboard");
         },
         onError: () => {
           setLoginError("Login failed. Check your username and password.");
-          toast.error("Login failed");
         },
       }
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-6xl w-full flex flex-col md:flex-row rounded-2xl overflow-hidden shadow-2xl">
-        {/* Left side - Branding */}
-        <div className="w-full md:w-2/5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-8 flex flex-col justify-center">
-          <div className="text-center md:text-left mb-8">
-            <div className="text-4xl font-bold mb-2">RMT</div>
-            <div className="text-xl opacity-90">Revive Meditech Pvt Ltd</div>
-          </div>
-          <div className="my-8">
-            <h2 className="text-2xl font-bold mb-4">
-              Secure File Management System
-            </h2>
-            <p className="opacity-90 mb-6">
-              Advanced permission-based file management designed for medical
-              research and innovation.
-            </p>
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <div className="bg-white bg-opacity-20 p-2 rounded-full mr-3">
-                  <span className="text-xl">🔐</span>
-                </div>
-                <span>Granular file and folder permissions</span>
-              </div>
-              <div className="flex items-center">
-                <div className="bg-white bg-opacity-20 p-2 rounded-full mr-3">
-                  <span className="text-xl">👥</span>
-                </div>
-                <span>User management with role-based access</span>
-              </div>
-              <div className="flex items-center">
-                <div className="bg-white bg-opacity-20 p-2 rounded-full mr-3">
-                  <span className="text-xl">📁</span>
-                </div>
-                <span>Hierarchical folder structure</span>
-              </div>
-            </div>
-          </div>
-          <div className="mt-8 text-sm opacity-80">
-            <p>Led by Dr. Murtaza Najabat Ali (CEng (UK), DIMechE, PE)</p>
-          </div>
+    <div className="min-h-screen bg-paper text-ink flex">
+      <aside className="hidden md:flex w-[42%] bg-[#0b1622] text-white flex-col justify-between p-10 lg:p-14">
+        <div>
+          <Link to="/" className="inline-block max-w-[240px]">
+            <img
+              src={Logo}
+              alt="Revive Medical Technologies"
+              className="w-full h-auto object-contain mix-blend-lighten"
+            />
+          </Link>
+          <h1 className="mt-10 text-3xl font-semibold tracking-tight leading-tight">
+            Electronic Document
+            <br />
+            Management System
+          </h1>
+          <p className="mt-4 text-[#8aa2b8] text-[15px] max-w-sm leading-relaxed">
+            Secure file and folder control for Revive Medical Technologies —
+            permissions, archive, and audit in one place.
+          </p>
+        </div>
+        <ul className="space-y-3 text-sm text-[#b8c6d3]">
+          <li className="flex gap-2">
+            <span className="text-[#5aa6e6]">—</span>
+            Granular view and download permissions
+          </li>
+          <li className="flex gap-2">
+            <span className="text-[#5aa6e6]">—</span>
+            Hierarchical folders with stamp-aware PDFs
+          </li>
+          <li className="flex gap-2">
+            <span className="text-[#5aa6e6]">—</span>
+            Full activity audit for super admins
+          </li>
+        </ul>
+      </aside>
+
+      <main className="flex-1 flex flex-col justify-center px-6 py-12 sm:px-10 lg:px-16">
+        <div className="md:hidden mb-8 max-w-[200px]">
+          <img
+            src={Logo}
+            alt="Revive Medical Technologies"
+            className="w-full h-auto object-contain"
+          />
         </div>
 
-        {/* Right side - Login Form */}
-        <div className="w-full md:w-3/5 bg-white p-8 md:p-12 flex flex-col justify-center">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              {isLogin ? "Welcome Back" : "Create Account"}
-            </h1>
-            <p className="text-gray-600">
-              {isLogin
-                ? "Sign in to access your files"
-                : "Join RMT's secure file management system"}
-            </p>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="w-full max-w-md mx-auto">
+          <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
+          <p className="mt-1.5 text-sm text-muted">
+            Use your EDMS account to continue
+          </p>
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             {loginError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-md border border-[#f5c2c0] bg-[#fdecea] px-3 py-2.5 text-sm text-[#b42318]">
                 {loginError}
               </div>
             )}
+
             <div>
               <label
                 htmlFor="username"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="block text-[13px] font-medium text-ink mb-1.5"
               >
                 Username
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500">👤</span>
-                </div>
+                <FiUser
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9a9384]"
+                  size={15}
+                />
                 <input
                   id="username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Enter your username"
+                  className="w-full h-11 pl-10 pr-3 rounded-md border border-rule bg-white text-sm text-ink placeholder:text-muted focus:outline-none focus:border-brand-dark"
+                  placeholder="Enter username"
                   required
+                  autoComplete="username"
                 />
               </div>
             </div>
+
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="block text-[13px] font-medium text-ink mb-1.5"
               >
                 Password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500">🔒</span>
-                </div>
+                <FiLock
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9a9384]"
+                  size={15}
+                />
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Enter your password"
+                  className="w-full h-11 pl-10 pr-11 rounded-md border border-rule bg-white text-sm text-ink placeholder:text-muted focus:outline-none focus:border-brand-dark"
+                  placeholder="Enter password"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-muted hover:text-ink rounded"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  <span className="text-gray-500 text-sm">
-                    {showPassword ? "🙈" : "👁️"}
-                  </span>
+                  {showPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
                 </button>
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={() => setRememberMe(!rememberMe)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label
-                  htmlFor="remember-me"
-                  className="ml-2 block text-sm text-gray-700"
-                >
-                  Remember me
-                </label>
-              </div>
 
-            </div>
+            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={() => setRememberMe((v) => !v)}
+                className="rounded border-rule"
+              />
+              Remember me
+            </label>
+
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-md hover:shadow-lg"
               disabled={login.isPending}
+              className="w-full h-11 rounded-md bg-[#0b1622] text-white text-sm font-medium hover:bg-ink-soft disabled:opacity-50 inline-flex items-center justify-center gap-2"
             >
-              {login.isPending ? "Signing In..." : "Sign In"}
+              {login.isPending && (
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
+              {login.isPending ? "Signing in…" : "Sign in"}
             </button>
           </form>
+
+          <p className="mt-8 text-center text-sm text-muted">
+            <Link to="/" className="hover:text-ink underline-offset-2 hover:underline">
+              Back to home
+            </Link>
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

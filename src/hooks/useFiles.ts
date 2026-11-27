@@ -31,23 +31,19 @@ const fetchFiles = async (folderId: number | null = null): Promise<File[]> => {
   return response.data.files as File[];
 };
 
-const uploadFile = async (data: FormData): Promise<File> => {
+type UploadFileParams = {
+  formData: FormData;
+  onProgress?: (percent: number) => void;
+};
+
+const uploadFile = async ({
+  formData,
+  onProgress,
+}: UploadFileParams): Promise<File> => {
   console.log("🚀 Starting file upload...");
 
-  // Debug: Log FormData contents
-  console.log("📋 FormData contents:");
-  for (let [key, value] of data.entries()) {
-    if (value instanceof File) {
-      console.log(
-        `  ${key}: File - ${value.name} (${value.size} bytes, ${value.type})`
-      );
-    } else {
-      console.log(`  ${key}: ${value}`);
-    }
-  }
-
   try {
-    const response = await axios.post(`${API_BASE_URL}/files/upload`, data, {
+    const response = await axios.post(`${API_BASE_URL}/files/upload`, formData, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "multipart/form-data",
@@ -57,10 +53,11 @@ const uploadFile = async (data: FormData): Promise<File> => {
         const progress = progressEvent.total
           ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
           : 0;
-        console.log(`📤 Upload Progress: ${progress}%`);
+        onProgress?.(Math.min(100, Math.max(0, progress)));
       },
     });
 
+    onProgress?.(100);
     console.log("✅ Upload successful:", response.data);
     // Backend returns { files: [...] } for bulk upload
     return response.data as any;
@@ -88,6 +85,7 @@ interface UploadFolderParams {
   paths: string[];
   folderId: number | null;
   allPaths: string[];
+  onProgress?: (percent: number) => void;
 }
 
 const uploadFolder = async ({
@@ -95,6 +93,7 @@ const uploadFolder = async ({
   paths,
   folderId,
   allPaths,
+  onProgress,
 }: UploadFolderParams): Promise<{ files: File[] }> => {
   console.log("🚀 Starting batched folder upload...");
   console.log(`TOTAL FILES: ${files.length}`);
@@ -102,6 +101,7 @@ const uploadFolder = async ({
   const BATCH_SIZE = 50; // Adjust based on server limits
   const fileChunks = chunkArray(files, BATCH_SIZE);
   const pathChunks = chunkArray(paths, BATCH_SIZE);
+  const batchCount = Math.max(1, fileChunks.length);
 
   const accumulatedFiles: File[] = [];
 
@@ -149,12 +149,11 @@ const uploadFolder = async ({
           },
           timeout: 300000, // 5 minute timeout per batch
           onUploadProgress: (progressEvent) => {
-            // Calculate progress relative to the WHOLE upload? 
-            // Or just log batch progress. Simple logging for now.
-            const progress = progressEvent.total
-              ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            const batchPct = progressEvent.total
+              ? progressEvent.loaded / progressEvent.total
               : 0;
-            console.log(`[Batch ${i + 1}] 📤 Upload Progress: ${progress}%`);
+            const overall = Math.round(((i + batchPct) / batchCount) * 100);
+            onProgress?.(Math.min(99, Math.max(0, overall)));
           },
         }
       );
@@ -163,8 +162,10 @@ const uploadFolder = async ({
       if (response.data.files) {
         accumulatedFiles.push(...response.data.files);
       }
+      onProgress?.(Math.round(((i + 1) / batchCount) * 100));
     }
 
+    onProgress?.(100);
     console.log("✅ All batches uploaded successfully!");
     return { files: accumulatedFiles };
 
@@ -281,13 +282,19 @@ const downloadFile = async (
 
 const downloadFolder = async (
   id: number,
-  withStamp: boolean = true
+  withStamp: boolean = true,
+  includeArchived: boolean = false
 ): Promise<void> => {
-  console.log(`📥 Downloading folder ${id}... stamp=${withStamp}`);
+  console.log(
+    `📥 Downloading folder ${id}... stamp=${withStamp} includeArchived=${includeArchived}`
+  );
 
   try {
     const response = await axios.get(`${API_BASE_URL}/folders/${id}/download`, {
-      params: { stamp: withStamp ? "1" : "0" },
+      params: {
+        stamp: withStamp ? "1" : "0",
+        ...(includeArchived ? { include_archived: "1" } : {}),
+      },
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       responseType: "blob",
     });
@@ -724,10 +731,12 @@ export const useDownloadFolder = () =>
     mutationFn: ({
       id,
       withStamp = true,
+      includeArchived = false,
     }: {
       id: number;
       withStamp?: boolean;
-    }) => downloadFolder(id, withStamp),
+      includeArchived?: boolean;
+    }) => downloadFolder(id, withStamp, includeArchived),
     onSuccess: () => {
       toast.success("Folder downloaded successfully!");
     },

@@ -1,109 +1,93 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Dialog } from "@headlessui/react";
 import { useUsers } from "../hooks/useAuth";
-import { useAssignPermission, useResourcePermissions, useRemovePermission } from "../hooks/usePermissions";
+import {
+  useAssignPermission,
+  useResourcePermissions,
+  useRemovePermission,
+} from "../hooks/usePermissions";
 import type { User } from "../types";
 import { FiKey, FiX, FiEye, FiDownload } from "react-icons/fi";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
 
 interface PermissionModalProps {
   isOpen: boolean;
   onClose: () => void;
   resourceId: number;
   resourceType: "folder" | "file";
-  showToast?: (message: string, type: "success" | "error" | "info" | "warning") => void;
+  showToast?: (
+    message: string,
+    type: "success" | "error" | "info" | "warning"
+  ) => void;
 }
 
-const TOAST_DURATION_MS = 3000;
+type TabKey = "none" | "view" | "view_download";
+
+const isSuperAdminRole = (role: unknown) => {
+  const r = String(role ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
+  return r === "superadmin" || r === "super_admin";
+};
 
 const PermissionModal: React.FC<PermissionModalProps> = ({
   isOpen,
   onClose,
   resourceId,
   resourceType,
-  showToast,
 }) => {
   const { data: users } = useUsers();
   const assignPermission = useAssignPermission();
   const removePermission = useRemovePermission();
-  const { data: resourcePermissions } = useResourcePermissions(resourceId, resourceType);
+  const { data: resourcePermissions } = useResourcePermissions(
+    resourceId,
+    resourceType
+  );
   const queryClient = useQueryClient();
 
-  // ---------------------------
-  // Canonical users: exclude super admins ALWAYS
-  // Normalize ids to Number, support `id` or `_id`, dedupe, sort ascending
-  // ---------------------------
+  const [activeTab, setActiveTab] = useState<TabKey>("none");
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [permissions, setPermissions] = useState({
+    can_read: false,
+    can_download: false,
+  });
+  const [initialPermissions, setInitialPermissions] = useState<{
+    can_read: boolean;
+    can_download: boolean;
+  } | null>(null);
+
   const availableUsers: User[] = useMemo(() => {
-    const raw = (users ?? []).filter(Boolean);
-
-    // helper to normalize role string and identify super-admin variants
-    const isSuperAdminRole = (role: any) => {
-      if (!role && role !== "") return false;
-      const r = String(role).toLowerCase().replace(/\s+/g, "");
-      return r === "superadmin" || r === "super_admin" || r === "superadmin";
-    };
-
     const map = new Map<number, User>();
-
-    for (const u of raw) {
-      // Accept either u.id or u._id
-      const rawId = (u as any).id ?? (u as any)._id;
-      const idNum = Number(rawId);
-
-      if (!Number.isFinite(idNum)) continue;
-
-      const role = (u as any).role ?? "";
-      if (isSuperAdminRole(role)) continue; // ALWAYS exclude super admin
-
-      // preserve username/name and other fields, but normalize id to number
-      const normalized: any = { ...u, id: idNum };
-
-      // dedupe by numeric id
-      map.set(idNum, normalized as User);
+    for (const u of users ?? []) {
+      const idNum = Number((u as any).id ?? (u as any)._id);
+      if (!Number.isFinite(idNum) || isSuperAdminRole((u as any).role)) continue;
+      map.set(idNum, { ...u, id: idNum } as User);
     }
-
     return Array.from(map.values()).sort((a, b) => Number(a.id) - Number(b.id));
   }, [users]);
 
-  // quick lookup of allowed ids (never includes super_admin ids)
-  const availableUserIdSet = useMemo(() => new Set(availableUsers.map((u) => Number((u as any).id))), [availableUsers]);
+  const availableUserIdSet = useMemo(
+    () => new Set(availableUsers.map((u) => Number(u.id))),
+    [availableUsers]
+  );
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<"none" | "view" | "view_download">("none");
-
-  // state: selected user ids (numbers only)
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
-  const [originalSelectedUsers, setOriginalSelectedUsers] = useState<number[] | null>(null);
-
-  const [permissions, setPermissions] = useState({ can_read: false, can_download: false });
-  const [initialPermissions, setInitialPermissions] = useState<{ can_read: boolean; can_download: boolean } | null>(null);
-
-  // Filter users into categories based on CURRENT permissions
   const { noPermissionUsers, viewOnlyUsers, viewDownloadUsers } = useMemo(() => {
     const noPerms: User[] = [];
     const viewOnly: User[] = [];
     const viewDownload: User[] = [];
 
-    availableUsers.forEach((user) => {
-      // Find current permission for this user
-      const idNum = Number((user as any).id);
+    for (const user of availableUsers) {
+      const idNum = Number(user.id);
       const perm = (resourcePermissions as any[])?.find(
-        (p) => Number((p as any).user_id ?? (p as any).userId) === idNum
+        (p) => Number(p.user_id ?? p.userId) === idNum
       );
-
       const canRead = !!perm?.can_read;
       const canDownload = !!perm?.can_download;
-
-      if (canRead && canDownload) {
-        viewDownload.push(user);
-      } else if (canRead) {
-        viewOnly.push(user);
-      } else {
-        noPerms.push(user);
-      }
-    });
+      if (canRead && canDownload) viewDownload.push(user);
+      else if (canRead) viewOnly.push(user);
+      else noPerms.push(user);
+    }
 
     return {
       noPermissionUsers: noPerms,
@@ -112,12 +96,6 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
     };
   }, [availableUsers, resourcePermissions]);
 
-  // Handle Tab Change
-  const handleTabChange = (tab: "none" | "view" | "view_download") => {
-    setActiveTab(tab);
-    setSelectedUsers([]); // Clear selection on tab switch
-  };
-
   const usersDisplay =
     activeTab === "view_download"
       ? viewDownloadUsers
@@ -125,120 +103,76 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
         ? viewOnlyUsers
         : noPermissionUsers;
 
-  const notify = (message: string, type: "success" | "error" | "info" | "warning") => {
-    toast.dismiss();
-    if (showToast) {
-      try { showToast(message, type); } catch { }
-    }
-    if (type === "success") toast.success(message, { autoClose: TOAST_DURATION_MS });
-    else if (type === "error") toast.error(message, { autoClose: TOAST_DURATION_MS });
-    else if (type === "info") toast.info(message, { autoClose: TOAST_DURATION_MS });
-    else toast.warn(message, { autoClose: TOAST_DURATION_MS });
-  };
-
-  const isAssigning =
-    (assignPermission as any).isLoading ||
-    (assignPermission as any).isPending ||
-    (assignPermission as any).status === "loading" ||
-    (removePermission as any).isLoading ||
-    (removePermission as any).isPending ||
-    (removePermission as any).status === "loading";
-
-  // Reset when modal opens
   useEffect(() => {
-    if (isOpen) {
-      setSelectedUsers([]);
-      setOriginalSelectedUsers(null);
-      setPermissions({ can_read: false, can_download: false });
-      setInitialPermissions(null);
-      setActiveTab("none");
-    }
-  }, [isOpen]);
-
-  // Build initial ORIGINAL selected users for change tracking, but start with EMPTY selection
-  useEffect(() => {
-    if (!isOpen || !resourcePermissions) return;
-
-    // Extract user_id from permissions, coerce to number, dedupe
-    const idsFromPerms = Array.from(
-      new Set(
-        (resourcePermissions as any[])
-          .filter((p) => p && (p.can_read || p.can_download))
-          .map((p) => Number((p as any).user_id ?? (p as any).userId ?? (p as any).user_id))
-      )
-    )
-      .filter((id) => Number.isFinite(id) && availableUserIdSet.has(id))
-      .sort((a, b) => a - b);
-
-    setOriginalSelectedUsers(idsFromPerms);
-    // CRITICAL: Do NOT set selectedUsers here. Start with empty selection so users must explicitly select who to modify.
-    // This prevents accidental modification of users hidden in other tabs.
-    // setSelectedUsers(idsFromPerms); 
-
+    if (!isOpen) return;
+    setSelectedUsers([]);
     setPermissions({ can_read: false, can_download: false });
     setInitialPermissions(null);
-  }, [isOpen, resourcePermissions, availableUserIdSet]);
+    setActiveTab("none");
+  }, [isOpen]);
 
-  // When selection changes, ensure only valid ids remain and compute permissions snapshot
   useEffect(() => {
     if (!resourcePermissions) return;
-
-    // Purge invalid ids that might somehow have slipped in
-    const validSelected = selectedUsers.filter((id) => availableUserIdSet.has(Number(id)));
-    if (validSelected.length !== selectedUsers.length) setSelectedUsers(validSelected);
+    const validSelected = selectedUsers.filter((id) =>
+      availableUserIdSet.has(Number(id))
+    );
+    if (validSelected.length !== selectedUsers.length) {
+      setSelectedUsers(validSelected);
+      return;
+    }
 
     if (validSelected.length === 1) {
-      const userId = validSelected[0];
-      const perm = (resourcePermissions as any[]).find((p) => Number((p as any).user_id ?? (p as any).userId) === userId);
-      const snapshot = perm ? { can_read: !!perm.can_read, can_download: !!perm.can_download } : { can_read: false, can_download: false };
+      const perm = (resourcePermissions as any[]).find(
+        (p) => Number(p.user_id ?? p.userId) === validSelected[0]
+      );
+      const snapshot = {
+        can_read: !!perm?.can_read,
+        can_download: !!perm?.can_download,
+      };
       setPermissions(snapshot);
       setInitialPermissions(snapshot);
     } else if (validSelected.length > 1) {
       const allCanRead = validSelected.every((userId) => {
-        const perm = (resourcePermissions as any[]).find((p) => Number((p as any).user_id ?? (p as any).userId) === userId);
-        return perm?.can_read ?? false;
+        const perm = (resourcePermissions as any[]).find(
+          (p) => Number(p.user_id ?? p.userId) === userId
+        );
+        return !!perm?.can_read;
       });
       const allCanDownload = validSelected.every((userId) => {
-        const perm = (resourcePermissions as any[]).find((p) => Number((p as any).user_id ?? (p as any).userId) === userId);
-        return perm?.can_download ?? false;
+        const perm = (resourcePermissions as any[]).find(
+          (p) => Number(p.user_id ?? p.userId) === userId
+        );
+        return !!perm?.can_download;
       });
-      const snap = { can_read: allCanRead, can_download: allCanRead && allCanDownload };
+      const snap = {
+        can_read: allCanRead,
+        can_download: allCanRead && allCanDownload,
+      };
       setPermissions(snap);
       setInitialPermissions(snap);
     } else {
       setInitialPermissions(null);
       setPermissions({ can_read: false, can_download: false });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUsers, resourcePermissions, availableUserIdSet]);
 
-  const anyPermissionSet = useMemo(() => permissions.can_read || permissions.can_download, [permissions]);
+  const isAssigning =
+    assignPermission.isPending || removePermission.isPending;
 
-  const selectedUsersChanged = useMemo(() => {
-    if (!originalSelectedUsers) return selectedUsers.length > 0;
-    if (originalSelectedUsers.length !== selectedUsers.length) return true;
-    const orig = new Set(originalSelectedUsers);
-    for (const id of selectedUsers) if (!orig.has(id)) return true;
-    return false;
-  }, [selectedUsers, originalSelectedUsers]);
+  const hasChanges = useMemo(() => {
+    if (selectedUsers.length === 0) return false;
+    if (!initialPermissions) {
+      return permissions.can_read || permissions.can_download;
+    }
+    return (
+      permissions.can_read !== initialPermissions.can_read ||
+      permissions.can_download !== initialPermissions.can_download
+    );
+  }, [selectedUsers, permissions, initialPermissions]);
 
-  const permissionsChanged = useMemo(() => {
-    if (!initialPermissions) return selectedUsers.length > 0 && anyPermissionSet;
-    return permissions.can_read !== initialPermissions.can_read || permissions.can_download !== initialPermissions.can_download;
-  }, [permissions, initialPermissions, selectedUsers.length, anyPermissionSet]);
-
-  const hasPermissionsChanged = selectedUsersChanged || permissionsChanged;
-
-  const hasNewSelectedUsers = useMemo(() => {
-    if (!originalSelectedUsers) return selectedUsers.length > 0;
-    const orig = new Set(originalSelectedUsers);
-    return selectedUsers.some((id) => !orig.has(id));
-  }, [selectedUsers, originalSelectedUsers]);
-
-  // Toggle user selection — only allowed ids from availableUserIdSet
-  const toggleUser = (userIdRaw: number | string) => {
+  const toggleUser = (userIdRaw: number) => {
     const userId = Number(userIdRaw);
-    if (!Number.isFinite(userId) || !availableUserIdSet.has(userId)) return;
+    if (!availableUserIdSet.has(userId)) return;
     setSelectedUsers((prev) => {
       const s = new Set(prev);
       if (s.has(userId)) s.delete(userId);
@@ -247,243 +181,238 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
     });
   };
 
-  const handlePermissionChange = (key: string, checked: boolean) => {
-    const newPerms = { ...permissions, [key]: checked } as typeof permissions;
-    if (key === "can_read" && !checked) newPerms.can_download = false;
-    setPermissions(newPerms);
+  const handlePermissionChange = (key: "can_read" | "can_download", checked: boolean) => {
+    setPermissions((prev) => {
+      const next = { ...prev, [key]: checked };
+      if (key === "can_read" && !checked) next.can_download = false;
+      return next;
+    });
   };
 
-  // Submit: ONLY apply changes to currently selected users
   const handleSubmit = async () => {
-    if (!hasPermissionsChanged) {
-      notify("No changes made to permissions", "info");
+    if (!hasChanges) {
+      toast.info("No changes made to permissions");
       onClose();
       return;
     }
 
-    // Only operate on users currently selected and available in the list
-    const currentSet = new Set(selectedUsers.filter((id) => availableUserIdSet.has(id)));
-
+    const current = selectedUsers.filter((id) => availableUserIdSet.has(id));
     const toRemove: number[] = [];
     const toAssign: number[] = [];
 
-    currentSet.forEach((id) => {
-      // If no permissions selected (both false), treat as removal for this user
-      if (!permissions.can_read && !permissions.can_download) {
-        toRemove.push(id);
-      } else {
-        toAssign.push(id);
-      }
-    });
-
-    // Remove duplicates (though Set handles this, strict safety)
-    const uniqueAssign = Array.from(new Set(toAssign));
-    const uniqueRemove = Array.from(new Set(toRemove));
-
-    const assignPromises = uniqueAssign.map((user_id) =>
-      (assignPermission as any).mutateAsync({ user_id, resource_id: resourceId, resource_type: resourceType, ...permissions })
-    );
-
-    const removePromises = uniqueRemove.map((user_id) =>
-      (removePermission as any).mutateAsyncByUser
-        ? (removePermission as any).mutateAsyncByUser({ user_id, resource_id: resourceId, resource_type: resourceType })
-        : (async () => {
-          const permObj = (resourcePermissions as any[])?.find((p) => Number((p as any).user_id ?? (p as any).userId) === user_id);
-          if (permObj && permObj.id) return (removePermission as any).mutateAsync(permObj.id);
-          // Fallback if no ID found but we want to "remove" (revoke all)
-          return (assignPermission as any).mutateAsync({ user_id, resource_id: resourceId, resource_type: resourceType, can_read: false, can_download: false });
-        })()
-    );
+    for (const id of current) {
+      if (!permissions.can_read && !permissions.can_download) toRemove.push(id);
+      else toAssign.push(id);
+    }
 
     try {
-      const settled = await Promise.allSettled([...assignPromises, ...removePromises]);
-      const rejects = settled.filter((r) => r.status === "rejected");
-      if (rejects.length === 0) notify("Permissions updated successfully", "success");
-      else notify(`Failed to update permissions for ${rejects.length} user(s)`, "error");
-
-      await queryClient.invalidateQueries({ queryKey: ["permissions", resourceId, resourceType] });
-
-      setTimeout(() => onClose(), TOAST_DURATION_MS + 200);
+      await Promise.all([
+        ...toAssign.map((user_id) =>
+          assignPermission.mutateAsync({
+            user_id,
+            resource_id: resourceId,
+            resource_type: resourceType,
+            ...permissions,
+          })
+        ),
+        ...toRemove.map(async (user_id) => {
+          const permObj = (resourcePermissions as any[])?.find(
+            (p) => Number(p.user_id ?? p.userId) === user_id
+          );
+          if (permObj?.id) return removePermission.mutateAsync(permObj.id);
+          return assignPermission.mutateAsync({
+            user_id,
+            resource_id: resourceId,
+            resource_type: resourceType,
+            can_read: false,
+            can_download: false,
+          });
+        }),
+      ]);
+      toast.success("Permissions updated");
+      await queryClient.invalidateQueries({
+        queryKey: ["permissions", resourceId, resourceType],
+      });
+      onClose();
     } catch (err) {
-      console.error("Permission update error:", err);
-      notify("Failed to update permissions", "error");
-      setTimeout(() => onClose(), TOAST_DURATION_MS + 200);
+      console.error(err);
+      toast.error("Failed to update permissions");
     }
   };
 
-  const permissionOptions = [
-    { key: "can_read", label: "View", icon: FiEye, description: "Can view this resource" },
-    { key: "can_download", label: "Download", icon: FiDownload, description: "Can download this resource" },
+  const tabs: { key: TabKey; label: string; count: number }[] = [
+    { key: "none", label: "No access", count: noPermissionUsers.length },
+    { key: "view", label: "View", count: viewOnlyUsers.length },
+    {
+      key: "view_download",
+      label: "View + Download",
+      count: viewDownloadUsers.length,
+    },
   ];
 
-  const getCurrentPermissionsText = () => {
-    if (selectedUsers.length > 1) {
-      const granted: string[] = [];
-      if (permissions.can_read) granted.push("View");
-      if (permissions.can_download) granted.push("Download");
-      return `${selectedUsers.length} users selected • ${granted.length ? granted.join(", ") : "No permissions granted"}`;
-    }
-    const granted: string[] = [];
-    if (permissions.can_read) granted.push("View");
-    if (permissions.can_download) granted.push("Download");
-    return granted.length ? granted.join(", ") : "No permissions granted";
-  };
-
   return (
-    <>
-      <ToastContainer
-        position="top-right"
-        autoClose={TOAST_DURATION_MS}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        limit={1}
-        style={{ zIndex: 999999 }}
-      />
-
-      <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-        <div className="fixed inset-0 bg-transparent backdrop-blur-md" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
-          <Dialog.Panel className="bg-white rounded-2xl shadow-2xl border border-gray-100 transform transition-all flex flex-col w-full max-w-2xl h-[min(640px,90vh)] max-h-[90vh] my-auto">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-purple-100 rounded-lg"><FiKey className="text-purple-600" size={18} /></div>
-                <div>
-                  <Dialog.Title className="text-xl font-bold text-gray-900">Assign Permissions</Dialog.Title>
-                  <p className="text-sm text-gray-500">Set permissions for this {resourceType}</p>
-                </div>
+    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+      <div className="fixed inset-0 bg-ink/40" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
+        <Dialog.Panel className="bg-white rounded-lg shadow-xl border border-rule w-full max-w-xl h-[min(640px,90vh)] flex flex-col my-auto">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-rule shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="h-9 w-9 rounded-md bg-[#0b1622] text-white flex items-center justify-center">
+                <FiKey size={16} />
+              </span>
+              <div>
+                <Dialog.Title className="text-[15px] font-semibold text-ink">
+                  Permissions
+                </Dialog.Title>
+                <p className="text-xs text-muted capitalize">
+                  {resourceType} access control
+                </p>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><FiX size={18} /></button>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 hover:bg-[#f3f1ea] rounded-md"
+            >
+              <FiX size={18} className="text-muted" />
+            </button>
+          </div>
+
+          <div className="flex border-b border-rule shrink-0">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.key);
+                  setSelectedUsers([]);
+                }}
+                className={`flex-1 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
+                  activeTab === tab.key
+                    ? "border-ink text-ink"
+                    : "border-transparent text-muted hover:text-ink"
+                }`}
+              >
+                {tab.label}
+                <span className="ml-1.5 inline-flex min-w-5 h-5 px-1.5 rounded bg-[#f3f1ea] text-[11px] tabular-nums items-center justify-center">
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+            <div>
+              <p className="text-[13px] font-medium text-ink mb-2">Users</p>
+              <div className="border border-rule rounded-md max-h-56 overflow-y-auto divide-y divide-[#eeeae1]">
+                {usersDisplay.map((u) => {
+                  const idNum = Number(u.id);
+                  const checked = selectedUsers.includes(idNum);
+                  return (
+                    <label
+                      key={idNum}
+                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#f8f7f3] cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleUser(idNum)}
+                        className="rounded border-rule"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-medium text-ink truncate">
+                          {(u as any).username ?? (u as any).name ?? `User ${idNum}`}
+                        </span>
+                        <span className="block text-[11px] text-muted capitalize">
+                          {(u as any).role ?? "user"}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+                {usersDisplay.length === 0 && (
+                  <p className="text-sm text-muted text-center py-8">
+                    No users in this category
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-200">
-              <button
-                onClick={() => handleTabChange("none")}
-                className={`flex-1 py-3 text-sm font-medium text-center border-b-2 transition-colors ${activeTab === "none"
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-              >
-                No Permissions
-                <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-                  {noPermissionUsers.length}
-                </span>
-              </button>
-              <button
-                onClick={() => handleTabChange("view")}
-                className={`flex-1 py-3 text-sm font-medium text-center border-b-2 transition-colors ${activeTab === "view"
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-              >
-                View Permissions
-                <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-                  {viewOnlyUsers.length}
-                </span>
-              </button>
-              <button
-                onClick={() => handleTabChange("view_download")}
-                className={`flex-1 py-3 text-sm font-medium text-center border-b-2 transition-colors ${activeTab === "view_download"
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-              >
-                View & Download
-                <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-                  {viewDownloadUsers.length}
-                </span>
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
-              <div className="flex flex-col h-full min-h-0">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select User</label>
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 min-h-[220px] max-h-[320px] overflow-auto">
-                  <div className="p-2 space-y-1">
-                    {usersDisplay.map((u) => {
-                      const idNum = Number((u as any).id);
-                      const checked = selectedUsers.includes(idNum);
-                      return (
-                        <label key={idNum} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 cursor-pointer">
-                          <div className="flex items-center space-x-3">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleUser(idNum)}
-                              className="mt-0.5 text-purple-600 focus:ring-purple-500 rounded"
-                            />
-                            <div className="text-sm">
-                              <div className="font-medium text-gray-900">{(u as any).username ?? (u as any).name ?? `User ${idNum}`}</div>
-                              <div className="text-xs text-gray-500">{(u as any).role ?? "user"}</div>
-                            </div>
-                          </div>
-                        </label>
-                      );
-                    })}
-                    {usersDisplay.length === 0 && <div className="text-sm text-gray-500 p-4 text-center">No users in this category</div>}
-                  </div>
-                </div>
-              </div>
-
-              {selectedUsers.length > 0 && (
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="text-xs font-medium text-gray-700 mb-1">Current Permissions:</div>
-                  <div className="text-sm text-gray-600">{getCurrentPermissionsText()}</div>
-                  {!permissionsChanged && initialPermissions && selectedUsers.length === 1 && (
-                    <div className="text-xs text-purple-600 mt-1 font-medium">• No changes made</div>
+            {selectedUsers.length > 0 && (
+              <div>
+                <p className="text-[13px] font-medium text-ink mb-2">
+                  Access for {selectedUsers.length} selected
+                </p>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 p-3 border border-rule rounded-md cursor-pointer hover:bg-[#f8f7f3]">
+                    <input
+                      type="checkbox"
+                      checked={permissions.can_read}
+                      onChange={(e) =>
+                        handlePermissionChange("can_read", e.target.checked)
+                      }
+                      className="mt-0.5 rounded border-rule"
+                    />
+                    <span>
+                      <span className="flex items-center gap-1.5 text-[13px] font-medium text-ink">
+                        <FiEye size={14} /> View
+                      </span>
+                      <span className="block text-xs text-muted mt-0.5">
+                        Can open and browse this {resourceType}
+                      </span>
+                    </span>
+                  </label>
+                  {permissions.can_read && (
+                    <label className="flex items-start gap-3 p-3 border border-rule rounded-md cursor-pointer hover:bg-[#f8f7f3]">
+                      <input
+                        type="checkbox"
+                        checked={permissions.can_download}
+                        onChange={(e) =>
+                          handlePermissionChange(
+                            "can_download",
+                            e.target.checked
+                          )
+                        }
+                        className="mt-0.5 rounded border-rule"
+                      />
+                      <span>
+                        <span className="flex items-center gap-1.5 text-[13px] font-medium text-ink">
+                          <FiDownload size={14} /> Download
+                        </span>
+                        <span className="block text-xs text-muted mt-0.5">
+                          Can download this {resourceType}
+                        </span>
+                      </span>
+                    </label>
                   )}
                 </div>
-              )}
+              </div>
+            )}
+          </div>
 
-              {selectedUsers.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Permissions</label>
-                  <div className="space-y-2">
-                    {permissionOptions.map(({ key, label, icon: Icon, description }) => {
-                      if (key === "can_download" && !permissions.can_read) return null;
-                      return (
-                        <label key={key} className="flex items-start space-x-2 p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={permissions[key as keyof typeof permissions]}
-                            onChange={(e) => handlePermissionChange(key, e.target.checked)}
-                            className="mt-0.5 text-purple-600 focus:ring-purple-500 rounded"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-1.5"><Icon size={14} className="text-gray-600" /><span className="text-sm font-medium text-gray-900">{label}</span></div>
-                            <p className="text-xs text-gray-500 mt-0.5">{description}</p>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
+          <div className="flex justify-end gap-2 px-5 py-4 border-t border-rule shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-9 px-4 rounded-md border border-rule text-[13px] font-medium text-ink"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!hasChanges || isAssigning}
+              className="h-9 px-4 rounded-md bg-[#0b1622] text-white text-[13px] font-medium hover:bg-ink-soft disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              {isAssigning && (
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               )}
-            </div>
-
-            <div className="flex justify-end space-x-3 p-5 border-t border-gray-100 flex-shrink-0">
-              <button onClick={onClose} className="px-5 py-2.5 text-sm border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">Cancel</button>
-              <button
-                onClick={handleSubmit}
-                disabled={!hasPermissionsChanged || isAssigning || (hasNewSelectedUsers && !permissions.can_read)}
-                className="px-5 py-2.5 text-sm bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isAssigning ? (
-                  <div className="flex items-center space-x-1.5">
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Saving...</span>
-                  </div>
-                ) : "Save"}
-              </button>
-            </div>
-          </Dialog.Panel>
-        </div>
-      </Dialog>
-    </>
+              Save
+            </button>
+          </div>
+        </Dialog.Panel>
+      </div>
+    </Dialog>
   );
 };
 

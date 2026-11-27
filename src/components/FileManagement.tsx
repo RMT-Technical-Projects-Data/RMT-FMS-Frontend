@@ -1009,16 +1009,19 @@ const FileManagement: React.FC<FileManagementProps> = ({
               <div className="p-4 overflow-visible">
                 {filteredFolders.length > 0 ? (
                   <div className="flex flex-wrap gap-3">
-                    {filteredFolders.map((folder) => (
+                    {filteredFolders.map((folder, index) => (
                       <div
                         key={folder.id}
                         onClick={() => handleFolderClick(folder)}
-                        className={`folder-card group relative inline-flex items-center gap-3 w-fit max-w-[260px] px-3.5 py-3 bg-white border border-rule rounded-lg cursor-pointer hover:border-[#b9b19f] hover:shadow-sm transition-all ${
+                        className={`folder-card group relative inline-flex items-center gap-3 w-fit max-w-[280px] px-3.5 py-3 bg-white border border-rule rounded-lg cursor-pointer hover:border-[#b9b19f] hover:shadow-sm transition-all ${
                           openDropdownId === folder.id ? "z-50" : "z-0"
                         }`}
                       >
-                        <span className="h-10 w-10 rounded-lg bg-[#0b1622] text-white flex items-center justify-center shrink-0">
-                          <FiFolder size={18} />
+                        <span className="h-10 w-10 rounded-lg bg-[#0b1622] text-white flex flex-col items-center justify-center shrink-0 gap-0.5">
+                          <span className="text-[10px] font-semibold tabular-nums leading-none opacity-90">
+                            {index + 1}
+                          </span>
+                          <FiFolder size={15} />
                         </span>
                         <div className="min-w-0">
                           <p className="font-semibold text-[14px] text-ink truncate max-w-[140px]">
@@ -1145,7 +1148,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
               <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3]">
                 <h3 className="text-[14px] font-semibold text-ink">Files</h3>
               </div>
-              <div className="p-4">
+              <div>
                 {filteredFiles.length > 0 ? (
                   <FileList
                     files={filteredFiles}

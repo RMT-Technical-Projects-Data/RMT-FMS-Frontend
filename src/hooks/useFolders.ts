@@ -368,6 +368,8 @@ export const useDeleteFolder = () => {
       queryClient.invalidateQueries({ queryKey: ["folderTree"] });
       // Invalidate all folder queries to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ["folders", undefined] });
+      queryClient.invalidateQueries({ queryKey: ["archivedFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["archivedFolders"] });
       toast.success("Folder moved to trash successfully!");
     },
     onError: (error: any) => {
@@ -539,6 +541,51 @@ export const useArchiveFolder = () => {
         error.response?.data?.error ||
           error.response?.data?.message ||
           "Failed to archive folder"
+      );
+    },
+  });
+};
+
+const unarchiveFolder = async (
+  id: number
+): Promise<{
+  message: string;
+  id: number;
+  name: string;
+  unarchivedFiles: number;
+}> => {
+  const response = await axios.post(
+    `${API_BASE_URL}/folders/${id}/unarchive`,
+    {},
+    {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    }
+  );
+  return response.data;
+};
+
+export const useUnarchiveFolder = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: unarchiveFolder,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFolders"] });
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["archivedFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["archivedFolders"] });
+      toast.success(
+        data.unarchivedFiles
+          ? `Folder restored (${data.unarchivedFiles} file${data.unarchivedFiles === 1 ? "" : "s"})`
+          : "Folder restored from archive"
+      );
+    },
+    onError: (error: any) => {
+      toast.error(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to unarchive folder"
       );
     },
   });

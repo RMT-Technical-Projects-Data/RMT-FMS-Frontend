@@ -1147,7 +1147,7 @@ const FileList: React.FC<FileListProps> = ({
   let body: React.ReactNode;
   if (files.length === 0) {
     body = (
-      <div className="bg-white border border-rule rounded-lg py-16 text-center">
+      <div className="bg-white py-16 text-center">
         <FiFile className="mx-auto text-muted mb-3" size={28} />
         <h3 className="text-[15px] font-semibold text-ink mb-1">No files found</h3>
         <p className="text-sm text-muted">
@@ -1161,94 +1161,106 @@ const FileList: React.FC<FileListProps> = ({
     );
   } else {
     body = (
-      <div className="flex flex-col gap-2">
-        {files.map((file) => {
-          const FileIcon = getFileIcon(file.mime_type);
-          const fileColor = getFileColor(file.mime_type);
-          const canView = hasViewPermission(file.id);
-
-          return (
-            <div
-              key={file.id}
-              className={`file-row flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-200 hover:border-blue-200 hover:bg-slate-50/80 transition-all ${
-                canView ? "cursor-pointer" : "cursor-not-allowed opacity-50"
-              } ${isTrashView || isArchiveView ? "opacity-75" : ""}`}
-            >
+      <div className="overflow-x-auto">
+        <table className="edms-table">
+          <thead>
+            <tr>
               {onToggleSelection && selectedFileIds && (
-                <div onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={selectedFileIds.includes(file.id)}
-                    onChange={() => onToggleSelection(file.id)}
-                    className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                  />
-                </div>
+                <th className="w-10" aria-label="Select" />
               )}
+              <th className="w-16">Sr No</th>
+              <th>File Name</th>
+              <th className="text-right w-[1%] whitespace-nowrap">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {files.map((file, index) => {
+              const FileIcon = getFileIcon(file.mime_type);
+              const fileColor = getFileColor(file.mime_type);
+              const canView = hasViewPermission(file.id);
 
-              <div className={`p-3 rounded-xl ${fileColor}`}>
-                <FileIcon size={24} />
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-gray-900 truncate">
-                  {file.name}
-                </h4>
-                {file.folder_name && (
-                  <p
-                    className="text-xs text-gray-400 truncate mt-0.5"
-                    title={file.folder_name}
-                  >
-                    in {file.folder_name}
-                  </p>
-                )}
-                <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
-                  <span>{formatFileSize(file.size || 0)}</span>
-                  <span>•</span>
-                  <span
-                    onClick={(e) => handleUploadDateClick(file, e)}
-                    className={
-                      userRole === "super_admin" && !isTrashView
-                        ? "select-none"
-                        : undefined
-                    }
-                  >
-                    {new Date(file.created_at).toLocaleDateString()}
-                  </span>
-                  {isTrashView && (
-                    <>
-                      <span>•</span>
-                      <span className="text-red-500 text-xs font-medium flex items-center">
-                        <FiClock className="mr-1" size={12} />
-                        {calculateRemainingDays(file.deleted_at)} days left
+              return (
+                <tr
+                  key={file.id}
+                  className={`${
+                    canView ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                  } ${isTrashView || isArchiveView ? "opacity-80" : ""}`}
+                >
+                  {onToggleSelection && selectedFileIds && (
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedFileIds.includes(file.id)}
+                        onChange={() => onToggleSelection(file.id)}
+                        className="w-4 h-4 rounded border-rule cursor-pointer"
+                      />
+                    </td>
+                  )}
+                  <td className="tabular-nums text-muted">{index + 1}</td>
+                  <td className="wrap min-w-[200px]">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className={`h-9 w-9 rounded-md flex items-center justify-center shrink-0 ${fileColor}`}
+                      >
+                        <FileIcon size={16} />
                       </span>
-                    </>
-                  )}
-                  {isArchiveView && (
-                    <>
-                      <span>•</span>
-                      <span className="text-amber-600 text-xs font-medium">
-                        Obsolete / Archived
-                      </span>
-                    </>
-                  )}
-                  {!canView && (
-                    <span className="text-red-500 text-xs font-medium">
-                      No view permission
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {renderActions(file)}
-            </div>
-          );
-        })}
+                      <div className="min-w-0">
+                        <p className="font-medium text-ink truncate">
+                          {file.name}
+                        </p>
+                        {file.folder_name && (
+                          <p
+                            className="text-[11px] text-muted truncate"
+                            title={file.folder_name}
+                          >
+                            in {file.folder_name}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[12px] text-muted">
+                          <span>{formatFileSize(file.size || 0)}</span>
+                          <span aria-hidden>•</span>
+                          <span
+                            onClick={(e) => handleUploadDateClick(file, e)}
+                            className={
+                              userRole === "super_admin" && !isTrashView
+                                ? "select-none hover:text-ink"
+                                : undefined
+                            }
+                          >
+                            {new Date(file.created_at).toLocaleDateString()}
+                          </span>
+                          {isTrashView && (
+                            <span className="text-[#b42318] inline-flex items-center gap-1">
+                              <FiClock size={11} />
+                              {calculateRemainingDays(file.deleted_at)} days left
+                            </span>
+                          )}
+                          {isArchiveView && (
+                            <span className="text-amber-700">Archived</span>
+                          )}
+                          {!canView && (
+                            <span className="text-[#b42318]">
+                              No view permission
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="text-right whitespace-nowrap">
+                    {renderActions(file)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div>
       {body}
       {/* Move File Modal */}
       <MoveFileModal
