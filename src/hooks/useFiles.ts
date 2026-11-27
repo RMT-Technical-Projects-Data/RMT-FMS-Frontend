@@ -304,6 +304,19 @@ const downloadFolder = async (
       throw new Error("No folder data received");
     }
 
+    const contentType = String(response.headers["content-type"] || "");
+    if (contentType.includes("application/json")) {
+      const text = await (response.data as Blob).text();
+      let message = "Folder download failed";
+      try {
+        const parsed = JSON.parse(text);
+        message = parsed.error || parsed.message || message;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(message);
+    }
+
     // Create blob and download
     const blob = new Blob([response.data]);
     const url = window.URL.createObjectURL(blob);
@@ -351,6 +364,20 @@ const downloadFolder = async (
   } catch (error: any) {
     console.error("❌ Folder download failed:", error);
 
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text();
+        const parsed = JSON.parse(text);
+        if (parsed?.error || parsed?.message) {
+          throw new Error(parsed.error || parsed.message);
+        }
+      } catch (inner: any) {
+        if (inner?.message && !inner.message.includes("JSON")) {
+          throw inner;
+        }
+      }
+    }
+
     // Handle specific error cases
     if (error.response?.status === 404) {
       throw new Error(
@@ -359,6 +386,11 @@ const downloadFolder = async (
     } else if (error.response?.status === 403) {
       throw new Error(
         "Permission denied - you don't have download permission for this folder"
+      );
+    } else if (error.response?.status === 422) {
+      throw new Error(
+        error.message ||
+          "Folder download failed: files could not be read from storage"
       );
     } else if (error.response?.status === 500) {
       throw new Error("Server error occurred");

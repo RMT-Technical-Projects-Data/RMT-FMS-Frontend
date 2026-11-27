@@ -7,6 +7,8 @@ import {
   getSessionTimeoutMins,
   SESSION_TIMEOUT_KEY,
 } from "../utils/sessionTimeout";
+import { API_BASE_URL } from "../config";
+import { getCachedDeviceIp } from "../utils/clientIp";
 
 const WARNING_SECONDS = 30;
 
@@ -42,10 +44,25 @@ const SessionTimeoutWatcher = () => {
 
   const logoutForIdle = useCallback(
     (reason: "expired" | "manual" = "expired") => {
-      if (!localStorage.getItem("token") && reason === "expired") return;
+      const token = localStorage.getItem("token");
+      if (!token && reason === "expired") return;
       clearTimers();
       warningOpenRef.current = false;
       setWarningOpen(false);
+
+      if (token) {
+        const deviceIp = getCachedDeviceIp();
+        fetch(`${API_BASE_URL}/auth/logout`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(deviceIp ? { "X-Client-Device-IP": deviceIp } : {}),
+          },
+        }).catch(() => {
+          /* best-effort audit */
+        });
+      }
+
       clearAuth();
       if (reason === "expired") {
         toast.info("Session expired due to inactivity. Please sign in again.");

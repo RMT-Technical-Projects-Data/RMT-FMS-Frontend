@@ -59,6 +59,8 @@ export interface ActivityAuditLog {
   resource_name: string | null;
   details: string | null;
   ip_address: string | null;
+  device_ip?: string | null;
+  server_ip?: string | null;
   status: string;
   created_at: string;
 }

@@ -23,23 +23,30 @@ const ACTION_LABELS: Record<string, string> = {
   archive: "Archive",
   restore: "Restore",
   rename: "Rename",
+  edit: "Edit",
+  move: "Move",
   open: "Open",
+  permission: "Permission",
 };
 
 const ACTION_OPTIONS = [
   "login",
   "login_failed",
+  "logout",
   "download",
+  "upload",
+  "open",
+  "edit",
+  "rename",
+  "move",
+  "create_folder",
   "delete_file",
   "delete_folder",
   "permanent_delete",
-  "upload",
-  "create_folder",
-  "create_user",
   "archive",
   "restore",
-  "rename",
-  "open",
+  "permission",
+  "create_user",
 ];
 
 const badgeClass = (action: string, status: string) => {
@@ -176,10 +183,27 @@ const AuditLogsView: React.FC<AuditLogsViewProps> = ({ user }) => {
     },
     {
       key: "ip_address",
-      title: "IP",
+      title: "Network IP",
+      width: 130,
       dataIndex: "ip_address",
       render: (r) => (
-        <span className="tabular-nums text-muted">{r.ip_address || "—"}</span>
+        <span className="tabular-nums text-muted" title="Wi‑Fi / connection IP">
+          {r.ip_address || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "device_ip",
+      title: "Device IP",
+      width: 130,
+      sortValue: (r) => r.device_ip || "",
+      render: (r) => (
+        <span
+          className="tabular-nums text-muted"
+          title="Device LAN IP where the browser is running"
+        >
+          {r.device_ip || "—"}
+        </span>
       ),
     },
     {

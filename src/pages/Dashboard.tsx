@@ -324,7 +324,23 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      if (token) {
+        const { API_BASE_URL } = await import("../config");
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "X-Client-Device-IP":
+              localStorage.getItem("edms_device_ip") || "",
+          },
+        });
+      }
+    } catch {
+      /* best-effort audit */
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem(DASHBOARD_STATE_KEY);

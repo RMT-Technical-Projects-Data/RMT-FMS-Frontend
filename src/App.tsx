@@ -7,6 +7,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import React, { useEffect } from "react";
 import axios from "axios";
 import SessionTimeoutWatcher from "./components/SessionTimeoutWatcher";
+import { detectDeviceIp, getCachedDeviceIp } from "./utils/clientIp";
 
 /** Send already-logged-in users away from public pages */
 const PublicOnly = ({ children }: { children: React.ReactNode }) => {
@@ -19,6 +20,17 @@ function App() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    detectDeviceIp();
+
+    const requestInterceptor = axios.interceptors.request.use((config) => {
+      const deviceIp = getCachedDeviceIp();
+      if (deviceIp) {
+        config.headers = config.headers || {};
+        config.headers["X-Client-Device-IP"] = deviceIp;
+      }
+      return config;
+    });
+
     // Global interceptor for 401 Unauthorized (Session Expired)
     const interceptor = axios.interceptors.response.use(
       (response) => response,
@@ -34,6 +46,7 @@ function App() {
     );
 
     return () => {
+      axios.interceptors.request.eject(requestInterceptor);
       axios.interceptors.response.eject(interceptor);
     };
   }, [navigate]);
