@@ -1182,9 +1182,9 @@ const FileList: React.FC<FileListProps> = ({
               return (
                 <tr
                   key={file.id}
-                  className={`${
+                  className={
                     canView ? "cursor-pointer" : "cursor-not-allowed opacity-50"
-                  } ${isTrashView || isArchiveView ? "opacity-80" : ""}`}
+                  }
                 >
                   {onToggleSelection && selectedFileIds && (
                     <td onClick={(e) => e.stopPropagation()}>
@@ -1208,7 +1208,7 @@ const FileList: React.FC<FileListProps> = ({
                         <p className="font-medium text-ink truncate">
                           {file.name}
                         </p>
-                        {file.folder_name && (
+                        {!isTrashView && !isArchiveView && file.folder_name && (
                           <p
                             className="text-[11px] text-muted truncate"
                             title={file.folder_name}
@@ -1227,13 +1227,21 @@ const FileList: React.FC<FileListProps> = ({
                                 : undefined
                             }
                           >
-                            {new Date(file.created_at).toLocaleDateString()}
+                            {new Date(
+                              isTrashView && file.deleted_at
+                                ? file.deleted_at
+                                : file.created_at
+                            ).toLocaleDateString()}
                           </span>
                           {isTrashView && (
-                            <span className="text-[#b42318] inline-flex items-center gap-1">
-                              <FiClock size={11} />
-                              {calculateRemainingDays(file.deleted_at)} days left
-                            </span>
+                            <>
+                              <span aria-hidden>•</span>
+                              <span className="text-[#b42318] inline-flex items-center gap-1">
+                                <FiClock size={11} />
+                                {calculateRemainingDays(file.deleted_at)} days
+                                left
+                              </span>
+                            </>
                           )}
                           {isArchiveView && (
                             <span className="text-amber-700">Archived</span>

@@ -564,6 +564,62 @@ const TrashView: React.FC<TrashViewProps> = ({
     return daysLeft > 0 ? daysLeft : 0;
   };
 
+  type SortMode = "name_asc" | "newest" | "oldest";
+  const readSortMode = (key: string): SortMode => {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved === "newest" || saved === "oldest" || saved === "name_asc") {
+        return saved;
+      }
+    } catch {
+      /* ignore */
+    }
+    return "name_asc";
+  };
+
+  const [folderSortMode, setFolderSortMode] = React.useState<SortMode>(() =>
+    readSortMode("edms_trash_folder_sort")
+  );
+  const [fileSortMode, setFileSortMode] = React.useState<SortMode>(() =>
+    readSortMode("edms_trash_file_sort")
+  );
+
+  React.useEffect(() => {
+    localStorage.setItem("edms_trash_folder_sort", folderSortMode);
+  }, [folderSortMode]);
+
+  React.useEffect(() => {
+    localStorage.setItem("edms_trash_file_sort", fileSortMode);
+  }, [fileSortMode]);
+
+  const sortByMode = <
+    T extends { name?: string; created_at?: string; deleted_at?: string | null }
+  >(
+    items: T[],
+    mode: SortMode
+  ): T[] => {
+    const copy = [...items];
+    copy.sort((a, b) => {
+      if (mode === "name_asc") {
+        return String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+          sensitivity: "base",
+          numeric: true,
+        });
+      }
+      const dateOf = (item: T) => {
+        const raw = item.deleted_at || item.created_at;
+        return raw ? new Date(raw).getTime() : 0;
+      };
+      const at = dateOf(a);
+      const bt = dateOf(b);
+      return mode === "oldest" ? at - bt : bt - at;
+    });
+    return copy;
+  };
+
+  const sortedFolders = sortByMode(trashFolders || [], folderSortMode);
+  const sortedFiles = sortByMode(trashFiles || [], fileSortMode);
+
   const isLoading = filesLoading || foldersLoading;
 
   return (
@@ -620,13 +676,26 @@ const TrashView: React.FC<TrashViewProps> = ({
       ) : (
         <>
           <section className="border border-rule rounded-lg bg-white overflow-visible">
-            <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3] rounded-t-lg">
+            <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3] rounded-t-lg flex items-center justify-between gap-3">
               <h3 className="text-[14px] font-semibold text-ink">Folders</h3>
+              <select
+                value={folderSortMode === "name_asc" ? "" : folderSortMode}
+                onChange={(e) =>
+                  setFolderSortMode((e.target.value || "name_asc") as SortMode)
+                }
+                className="h-8 rounded-md border border-rule bg-white px-2 text-[12px] text-ink focus:outline-none focus:border-brand-dark"
+                aria-label="Filter folders"
+                title="Filter folders"
+              >
+                <option value="">Default</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
             </div>
             <div className="p-4 overflow-visible">
-              {trashFolders && trashFolders.length > 0 ? (
+              {sortedFolders.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {trashFolders.map((folder, index) => {
+                  {sortedFolders.map((folder, index) => {
                     const daysLeft = calculateRemainingDays(folder.deleted_at);
                     const isSelected = selectedFolderIds.includes(folder.id);
 
@@ -728,13 +797,26 @@ const TrashView: React.FC<TrashViewProps> = ({
           </section>
 
           <section className="border border-rule rounded-lg overflow-hidden bg-white">
-            <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3]">
+            <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3] flex items-center justify-between gap-3">
               <h3 className="text-[14px] font-semibold text-ink">Files</h3>
+              <select
+                value={fileSortMode === "name_asc" ? "" : fileSortMode}
+                onChange={(e) =>
+                  setFileSortMode((e.target.value || "name_asc") as SortMode)
+                }
+                className="h-8 rounded-md border border-rule bg-white px-2 text-[12px] text-ink focus:outline-none focus:border-brand-dark"
+                aria-label="Filter files"
+                title="Filter files"
+              >
+                <option value="">Default</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
             </div>
             <div>
-              {trashFiles && trashFiles.length > 0 ? (
+              {sortedFiles.length > 0 ? (
                 <FileList
-                  files={trashFiles}
+                  files={sortedFiles}
                   viewMode="list"
                   onAssignPermission={onAssignPermission}
                   userRole={user.role}
