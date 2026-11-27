@@ -77,7 +77,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               >
                 {SESSION_TIMEOUT_OPTIONS.map((m) => (
                   <option key={m} value={m}>
-                    {m} minute{m === 1 ? "" : "s"}
+                    {m} minutes
                     {m === 5 ? " (default)" : ""}
                   </option>
                 ))}
