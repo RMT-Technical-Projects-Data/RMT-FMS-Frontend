@@ -625,7 +625,7 @@ const TrashView: React.FC<TrashViewProps> = ({
             </div>
             <div className="p-4 overflow-visible">
               {trashFolders && trashFolders.length > 0 ? (
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {trashFolders.map((folder, index) => {
                     const daysLeft = calculateRemainingDays(folder.deleted_at);
                     const isSelected = selectedFolderIds.includes(folder.id);
@@ -634,13 +634,14 @@ const TrashView: React.FC<TrashViewProps> = ({
                       <div
                         key={folder.id}
                         onClick={() => handleFolderClick(folder)}
-                        className={`folder-card relative inline-flex items-center gap-3 w-fit max-w-[280px] px-3.5 py-3 bg-white border rounded-lg cursor-pointer transition-all ${
+                        className={`folder-card relative flex items-center gap-2.5 w-full min-w-0 px-3 py-3 bg-white border rounded-lg cursor-pointer transition-all ${
                           isSelected
                             ? "border-ink shadow-sm"
                             : "border-rule hover:border-[#b9b19f]"
                         } ${openDropdownId === folder.id ? "z-50" : "z-0"}`}
                       >
                         <div
+                          className="shrink-0"
                           onClick={(e) =>
                             handleToggleFolderSelection(folder.id, e)
                           }
@@ -658,8 +659,11 @@ const TrashView: React.FC<TrashViewProps> = ({
                         <span className="h-10 w-10 rounded-lg bg-[#0b1622] text-white flex items-center justify-center shrink-0">
                           <FiFolder size={18} />
                         </span>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-[14px] text-ink truncate max-w-[120px]">
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className="font-semibold text-[14px] text-ink truncate"
+                            title={folder.name}
+                          >
                             {folder.name}
                           </p>
                           <p className="text-[12px] text-[#b42318] inline-flex items-center gap-1">
@@ -668,7 +672,7 @@ const TrashView: React.FC<TrashViewProps> = ({
                           </p>
                         </div>
                         <div
-                          className="relative shrink-0"
+                          className="relative shrink-0 ml-auto"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
