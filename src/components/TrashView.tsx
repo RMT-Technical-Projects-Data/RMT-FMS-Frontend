@@ -652,11 +652,11 @@ const TrashView: React.FC<TrashViewProps> = ({
                             className="w-4 h-4 rounded border-rule cursor-pointer"
                           />
                         </div>
-                        <span className="h-10 w-10 rounded-lg bg-[#0b1622] text-white flex flex-col items-center justify-center shrink-0 gap-0.5">
-                          <span className="text-[10px] font-semibold tabular-nums leading-none opacity-90">
-                            {index + 1}
-                          </span>
-                          <FiFolder size={15} />
+                        <span className="h-6 min-w-6 px-1.5 rounded-md bg-[#f3f1ea] border border-rule text-[12px] font-semibold tabular-nums text-ink flex items-center justify-center shrink-0">
+                          {index + 1}
+                        </span>
+                        <span className="h-10 w-10 rounded-lg bg-[#0b1622] text-white flex items-center justify-center shrink-0">
+                          <FiFolder size={18} />
                         </span>
                         <div className="min-w-0">
                           <p className="font-semibold text-[14px] text-ink truncate max-w-[120px]">

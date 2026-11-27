@@ -17,15 +17,49 @@ import ArchiveView from "../components/ArchiveView";
 import AuditLogsView from "../components/AuditLogsView";
 import type { User } from "../types";
 
+const DASHBOARD_STATE_KEY = "edms_dashboard_nav";
+
+type SavedDashboardState = {
+  activeView?: string;
+  selectedFolderId?: number | null;
+  selectedFolderName?: string | null;
+  navigationHistory?: number[];
+  navigationNameHistory?: (string | null)[];
+  isGlobalSearch?: boolean;
+};
+
+const readSavedDashboardState = (): SavedDashboardState => {
+  try {
+    const raw = localStorage.getItem(DASHBOARD_STATE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
 const Dashboard: React.FC = () => {
-  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
-  const [selectedFolderName, setSelectedFolderName] = useState<string | null>(
-    null
+  const saved = useMemo(() => readSavedDashboardState(), []);
+
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(
+    typeof saved.selectedFolderId === "number" ? saved.selectedFolderId : null
   );
-  const [navigationHistory, setNavigationHistory] = useState<number[]>([]);
+  const [selectedFolderName, setSelectedFolderName] = useState<string | null>(
+    typeof saved.selectedFolderName === "string"
+      ? saved.selectedFolderName
+      : null
+  );
+  const [navigationHistory, setNavigationHistory] = useState<number[]>(
+    Array.isArray(saved.navigationHistory) ? saved.navigationHistory : []
+  );
   const [navigationNameHistory, setNavigationNameHistory] = useState<
     (string | null)[]
-  >([]);
+  >(
+    Array.isArray(saved.navigationNameHistory)
+      ? saved.navigationNameHistory
+      : []
+  );
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
@@ -39,8 +73,14 @@ const Dashboard: React.FC = () => {
   });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isGlobalSearch, setIsGlobalSearch] = useState(false);
-  const [activeView, setActiveView] = useState("dashboard");
+  const [isGlobalSearch, setIsGlobalSearch] = useState(
+    !!saved.isGlobalSearch
+  );
+  const [activeView, setActiveView] = useState(
+    typeof saved.activeView === "string" && saved.activeView
+      ? saved.activeView
+      : "dashboard"
+  );
   const [permissionResource, setPermissionResource] = useState<{
     id: number;
     type: "folder" | "file";
@@ -49,6 +89,16 @@ const Dashboard: React.FC = () => {
 
   const navigate = useNavigate();
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
+
+  useEffect(() => {
+    // Non–super-admins shouldn't land on admin-only views after reload
+    if (
+      user.role !== "super_admin" &&
+      ["audit", "trash", "users"].includes(activeView)
+    ) {
+      setActiveView("dashboard");
+    }
+  }, [user.role, activeView]);
 
   useEffect(() => {
     try {
@@ -60,6 +110,29 @@ const Dashboard: React.FC = () => {
       /* optional */
     }
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    try {
+      const payload: SavedDashboardState = {
+        activeView,
+        selectedFolderId,
+        selectedFolderName,
+        navigationHistory,
+        navigationNameHistory,
+        isGlobalSearch,
+      };
+      localStorage.setItem(DASHBOARD_STATE_KEY, JSON.stringify(payload));
+    } catch {
+      /* optional */
+    }
+  }, [
+    activeView,
+    selectedFolderId,
+    selectedFolderName,
+    navigationHistory,
+    navigationNameHistory,
+    isGlobalSearch,
+  ]);
 
   useEffect(() => {
     const container = document.getElementById("file-management-wrapper");
@@ -156,6 +229,7 @@ const Dashboard: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem(DASHBOARD_STATE_KEY);
     navigate("/login");
   };
 
