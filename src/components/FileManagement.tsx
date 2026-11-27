@@ -873,36 +873,49 @@ const FileManagement: React.FC<FileManagementProps> = ({
     console.log("🔍 [FileManagement] Root files loading:", rootFilesLoading);
   }, [displayFiles, selectedFolderId, selectedFolderName, filesLoading, rootFilesLoading]);
 
-  type SortMode = "newest" | "oldest" | "name_asc" | "name_desc";
-  const [sortMode, setSortMode] = React.useState<SortMode>(() => {
-    const saved = localStorage.getItem("edms_library_sort");
-    return saved === "oldest" ||
-      saved === "name_asc" ||
-      saved === "name_desc" ||
-      saved === "newest"
-      ? saved
-      : "newest";
-  });
+  type SortMode = "name_asc" | "newest" | "oldest";
+  const readSortMode = (key: string): SortMode => {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved === "newest" || saved === "oldest" || saved === "name_asc") {
+        return saved;
+      }
+    } catch {
+      /* ignore */
+    }
+    return "name_asc";
+  };
+
+  const [folderSortMode, setFolderSortMode] = React.useState<SortMode>(() =>
+    readSortMode("edms_folder_sort")
+  );
+  const [fileSortMode, setFileSortMode] = React.useState<SortMode>(() =>
+    readSortMode("edms_file_sort")
+  );
 
   React.useEffect(() => {
-    localStorage.setItem("edms_library_sort", sortMode);
-  }, [sortMode]);
+    localStorage.setItem("edms_folder_sort", folderSortMode);
+  }, [folderSortMode]);
+
+  React.useEffect(() => {
+    localStorage.setItem("edms_file_sort", fileSortMode);
+  }, [fileSortMode]);
 
   const sortByMode = <T extends { name?: string; created_at?: string }>(
-    items: T[]
+    items: T[],
+    mode: SortMode
   ): T[] => {
     const copy = [...items];
     copy.sort((a, b) => {
-      if (sortMode === "name_asc" || sortMode === "name_desc") {
-        const cmp = String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+      if (mode === "name_asc") {
+        return String(a.name || "").localeCompare(String(b.name || ""), undefined, {
           sensitivity: "base",
           numeric: true,
         });
-        return sortMode === "name_asc" ? cmp : -cmp;
       }
       const at = a.created_at ? new Date(a.created_at).getTime() : 0;
       const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return sortMode === "oldest" ? at - bt : bt - at;
+      return mode === "oldest" ? at - bt : bt - at;
     });
     return copy;
   };
@@ -913,7 +926,8 @@ const FileManagement: React.FC<FileManagementProps> = ({
       ? displayFiles || []
       : displayFiles?.filter(
           (file) => !q || file.name.toLowerCase().includes(q)
-        ) || []
+        ) || [],
+    fileSortMode
   );
 
   const filteredFolders = sortByMode(
@@ -921,7 +935,8 @@ const FileManagement: React.FC<FileManagementProps> = ({
       ? displayFolders || []
       : displayFolders?.filter(
           (folder) => !q || folder.name.toLowerCase().includes(q)
-        ) || []
+        ) || [],
+    folderSortMode
   );
 
   const handleRenameFolder = (folderId: number, currentName: string) => {
@@ -1012,18 +1027,6 @@ const FileManagement: React.FC<FileManagementProps> = ({
             </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="h-9 rounded-md border border-rule bg-white px-2.5 text-[13px] text-ink focus:outline-none focus:border-brand-dark"
-              aria-label="Sort folders and files"
-              title="Sort folders and files"
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="name_asc">Name A–Z</option>
-              <option value="name_desc">Name Z–A</option>
-            </select>
             {user.role === "super_admin" && (
               <button
                 onClick={handleCreateFolder}
@@ -1053,8 +1056,23 @@ const FileManagement: React.FC<FileManagementProps> = ({
           <>
             {/* Folders Section */}
             <section className="border border-rule rounded-lg bg-white overflow-visible">
-              <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3] rounded-t-lg">
+              <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3] rounded-t-lg flex items-center justify-between gap-3">
                 <h3 className="text-[14px] font-semibold text-ink">Folders</h3>
+                <select
+                  value={folderSortMode === "name_asc" ? "" : folderSortMode}
+                  onChange={(e) =>
+                    setFolderSortMode(
+                      (e.target.value || "name_asc") as SortMode
+                    )
+                  }
+                  className="h-8 rounded-md border border-rule bg-white px-2 text-[12px] text-ink focus:outline-none focus:border-brand-dark"
+                  aria-label="Filter folders"
+                  title="Filter folders"
+                >
+                  <option value="">Default</option>
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                </select>
               </div>
               <div className="p-4 overflow-visible">
                 {filteredFolders.length > 0 ? (
@@ -1198,8 +1216,21 @@ const FileManagement: React.FC<FileManagementProps> = ({
 
             {/* Files Section */}
             <section className="border border-rule rounded-lg overflow-hidden bg-white">
-              <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3]">
+              <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3] flex items-center justify-between gap-3">
                 <h3 className="text-[14px] font-semibold text-ink">Files</h3>
+                <select
+                  value={fileSortMode === "name_asc" ? "" : fileSortMode}
+                  onChange={(e) =>
+                    setFileSortMode((e.target.value || "name_asc") as SortMode)
+                  }
+                  className="h-8 rounded-md border border-rule bg-white px-2 text-[12px] text-ink focus:outline-none focus:border-brand-dark"
+                  aria-label="Filter files"
+                  title="Filter files"
+                >
+                  <option value="">Default</option>
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                </select>
               </div>
               <div>
                 {filteredFiles.length > 0 ? (
