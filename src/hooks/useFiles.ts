@@ -199,6 +199,7 @@ const downloadFile = async (
       params: { stamp: withStamp ? "1" : "0" },
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       responseType: "blob",
+      timeout: 300000, // 5 minutes for large stamped PDFs
     });
     console.log(`✅ Download successful`);
     console.log("🔍 All response headers:", response.headers);
@@ -297,6 +298,7 @@ const downloadFolder = async (
       },
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       responseType: "blob",
+      timeout: 600000, // 10 minutes for large folder zips
     });
 
     // Check if response is valid
