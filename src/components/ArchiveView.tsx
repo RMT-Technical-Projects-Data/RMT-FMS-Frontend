@@ -122,12 +122,12 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
             </div>
             <div className="p-4 overflow-visible">
               {folders.length > 0 ? (
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {folders.map((folder, index) => (
                     <div
                       key={folder.id}
                       onClick={() => handleFolderClick(folder)}
-                      className={`folder-card group relative inline-flex items-center gap-3 w-fit max-w-[280px] px-3.5 py-3 bg-white border border-rule rounded-lg cursor-pointer hover:border-[#b9b19f] hover:shadow-sm transition-all ${
+                      className={`folder-card group relative flex items-center gap-2.5 w-full min-w-0 px-3 py-3 bg-white border border-rule rounded-lg cursor-pointer hover:border-[#b9b19f] hover:shadow-sm transition-all ${
                         openDropdownId === folder.id ? "z-50" : "z-0"
                       }`}
                     >
@@ -137,14 +137,17 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
                       <span className="h-10 w-10 rounded-lg bg-[#0b1622] text-white flex items-center justify-center shrink-0">
                         <FiFolder size={18} />
                       </span>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-[14px] text-ink truncate max-w-[140px]">
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className="font-semibold text-[14px] text-ink truncate"
+                          title={folder.name}
+                        >
                           {folder.name}
                         </p>
                         <p className="text-[12px] text-muted">Archive path</p>
                       </div>
                       <div
-                        className="relative shrink-0 ml-0.5"
+                        className="relative shrink-0 ml-auto"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
