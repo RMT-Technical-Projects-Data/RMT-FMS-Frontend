@@ -420,6 +420,27 @@ const fetchDownloadAuditLogs = async (): Promise<{
   return response.data;
 };
 
+const fetchActivityAuditLogs = async (params?: {
+  action?: string;
+  username?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{
+  logs: import("../types").ActivityAuditLog[];
+  total: number;
+}> => {
+  const response = await axios.get(`${API_BASE_URL}/files/audit/activity`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    params: {
+      limit: params?.limit ?? 10,
+      offset: params?.offset ?? 0,
+      action: params?.action || undefined,
+      username: params?.username || undefined,
+    },
+  });
+  return response.data;
+};
+
 const fetchArchivedFiles = async (
   folderId: number | null = null
 ): Promise<File[]> => {
@@ -744,6 +765,24 @@ export const useDownloadAuditLogs = () =>
   useQuery({
     queryKey: ["downloadAuditLogs"],
     queryFn: fetchDownloadAuditLogs,
+    enabled: !!localStorage.getItem("token"),
+  });
+
+export const useActivityAuditLogs = (filters?: {
+  action?: string;
+  username?: string;
+  limit?: number;
+  offset?: number;
+}) =>
+  useQuery({
+    queryKey: [
+      "activityAuditLogs",
+      filters?.action || "",
+      filters?.username || "",
+      filters?.limit ?? 10,
+      filters?.offset ?? 0,
+    ],
+    queryFn: () => fetchActivityAuditLogs(filters),
     enabled: !!localStorage.getItem("token"),
   });
 

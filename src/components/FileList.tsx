@@ -568,6 +568,7 @@ import MoveFileModal from "./MoveFileModal";
 import ConfirmModal, { type ConfirmTone } from "./ConfirmModal";
 import PromptModal from "./PromptModal";
 import StampChoiceModal from "./StampChoiceModal";
+import type { ViewMode } from "../types";
 
 type FileConfirmAction =
   | "delete"
@@ -584,8 +585,7 @@ interface FileListProps {
   showFavouriteToggle?: boolean;
   isTrashView?: boolean;
   isArchiveView?: boolean;
-
-  // 👇 ADDED THESE PROPS to fix the TrashView error
+  viewMode?: ViewMode;
   selectedFileIds?: number[];
   onToggleSelection?: (fileId: number) => void;
 }
@@ -597,7 +597,7 @@ const FileList: React.FC<FileListProps> = ({
   userId,
   isTrashView = false,
   isArchiveView = false,
-  // 👇 Destructure new props
+  viewMode = "list",
   selectedFileIds,
   onToggleSelection,
 }) => {
@@ -1022,248 +1022,234 @@ const FileList: React.FC<FileListProps> = ({
     return daysLeft > 0 ? daysLeft : 0;
   };
 
-  return (
-    <div className="space-y-4">
-      {files.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-24 h-24 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <FiFile className="h-12 w-12 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            No files found
-          </h3>
-          <p className="text-gray-500 max-w-sm mx-auto">
-            {isTrashView
-              ? "Trash is empty."
-              : isArchiveView
+  const actionBtn =
+    "p-1.5 rounded-md text-muted hover:text-ink hover:bg-[#f3f1ea] transition-colors";
+
+  const renderActions = (file: File) => {
+    const canView = hasViewPermission(file.id);
+    const canDownload = hasDownloadPermission(file.id);
+    return (
+      <div
+        className="inline-flex items-center gap-0.5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {!isTrashView &&
+          !isArchiveView &&
+          (userRole === "super_admin" || file.created_by === userId) && (
+            <button
+              type="button"
+              onClick={() => handleRename(file.id, file.name)}
+              className={actionBtn}
+              title="Rename File"
+            >
+              <FiEdit3 size={16} />
+            </button>
+          )}
+        {canView && !isTrashView && !isArchiveView && userRole === "super_admin" && (
+          <button
+            type="button"
+            onClick={() => handleMoveClick(file.id, file.name)}
+            className={actionBtn}
+            title="Move File"
+          >
+            <FiMove size={16} />
+          </button>
+        )}
+        {canView && !isTrashView && (
+          <button
+            type="button"
+            onClick={() => handleOpenFile(file)}
+            className={actionBtn}
+            title={isArchiveView ? "Open (OBSOLETE)" : "Open in new window"}
+          >
+            <FiExternalLink size={16} />
+          </button>
+        )}
+        {canDownload && !isTrashView && (
+          <button
+            type="button"
+            onClick={() => requestDownload(file)}
+            className={actionBtn}
+            title="Download"
+          >
+            <FiDownload size={16} />
+          </button>
+        )}
+        {userRole === "super_admin" &&
+          !isTrashView &&
+          !isArchiveView &&
+          !file.folder_id && (
+            <button
+              type="button"
+              onClick={() => onAssignPermission(file.id, "file")}
+              className={actionBtn}
+              title="Set Permissions"
+            >
+              <FiKey size={16} />
+            </button>
+          )}
+        {!isTrashView && !isArchiveView && userRole === "super_admin" && (
+          <button
+            type="button"
+            onClick={() => handleArchive(file.id, file.name)}
+            className={actionBtn}
+            title="Move to Archive"
+          >
+            <FiArchive size={16} />
+          </button>
+        )}
+        {isArchiveView && (
+          <button
+            type="button"
+            onClick={() => handleUnarchive(file.id, file.name)}
+            className={actionBtn}
+            title="Restore from Archive"
+          >
+            <FiRotateCcw size={16} />
+          </button>
+        )}
+        {isTrashView && (
+          <>
+            <button
+              type="button"
+              onClick={() => handleRestore(file.id, file.name)}
+              className={actionBtn}
+              title="Restore"
+            >
+              <FiRotateCcw size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePermanentDelete(file.id, file.name)}
+              className={actionBtn}
+              title="Delete Forever"
+            >
+              <FiTrash2 size={16} />
+            </button>
+          </>
+        )}
+        {!isTrashView && !isArchiveView && userRole === "super_admin" && (
+          <button
+            type="button"
+            onClick={() => handleDelete(file.id, file.name)}
+            className={actionBtn}
+            title="Delete"
+          >
+            <FiTrash2 size={16} />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  void viewMode;
+
+  let body: React.ReactNode;
+  if (files.length === 0) {
+    body = (
+      <div className="bg-white border border-rule rounded-lg py-16 text-center">
+        <FiFile className="mx-auto text-muted mb-3" size={28} />
+        <h3 className="text-[15px] font-semibold text-ink mb-1">No files found</h3>
+        <p className="text-sm text-muted">
+          {isTrashView
+            ? "Trash is empty."
+            : isArchiveView
               ? "No archived documents."
               : "Get started by uploading your first file."}
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {files.map((file) => {
-            const FileIcon = getFileIcon(file.mime_type);
-            const fileColor = getFileColor(file.mime_type);
-            const canView = hasViewPermission(file.id);
-            const canDownload = hasDownloadPermission(file.id);
+        </p>
+      </div>
+    );
+  } else {
+    body = (
+      <div className="flex flex-col gap-2">
+        {files.map((file) => {
+          const FileIcon = getFileIcon(file.mime_type);
+          const fileColor = getFileColor(file.mime_type);
+          const canView = hasViewPermission(file.id);
 
-            return (
-              <div
-                key={file.id}
-                className={`flex items-center space-x-4 p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200 ${canView ? "cursor-pointer" : "cursor-not-allowed opacity-50"
-                  } ${isTrashView || isArchiveView ? "opacity-75" : ""}`}
-              >
+          return (
+            <div
+              key={file.id}
+              className={`file-row flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-200 hover:border-blue-200 hover:bg-slate-50/80 transition-all ${
+                canView ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+              } ${isTrashView || isArchiveView ? "opacity-75" : ""}`}
+            >
+              {onToggleSelection && selectedFileIds && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedFileIds.includes(file.id)}
+                    onChange={() => onToggleSelection(file.id)}
+                    className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                  />
+                </div>
+              )}
 
-                {/* 👇 CHECKBOX ADDED HERE */}
-                {onToggleSelection && selectedFileIds && (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedFileIds.includes(file.id)}
-                      onChange={() => onToggleSelection(file.id)}
-                      className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                    />
-                  </div>
+              <div className={`p-3 rounded-xl ${fileColor}`}>
+                <FileIcon size={24} />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-gray-900 truncate">
+                  {file.name}
+                </h4>
+                {file.folder_name && (
+                  <p
+                    className="text-xs text-gray-400 truncate mt-0.5"
+                    title={file.folder_name}
+                  >
+                    in {file.folder_name}
+                  </p>
                 )}
-
-                <div className={`p-3 rounded-xl ${fileColor}`}>
-                  <FileIcon size={24} />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-gray-900 truncate">
-                    {file.name}
-                  </h4>
-                  {file.folder_name && (
-                    <p className="text-xs text-gray-400 truncate mt-0.5" title={file.folder_name}>
-                      in {file.folder_name}
-                    </p>
-                  )}
-                  <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
-                    <span>{formatFileSize(file.size || 0)}</span>
-                    <span>•</span>
-                    <span
-                      onClick={(e) => handleUploadDateClick(file, e)}
-                      className={
-                        userRole === "super_admin" && !isTrashView
-                          ? "select-none"
-                          : undefined
-                      }
-                    >
-                      {new Date(file.created_at).toLocaleDateString()}
-                    </span>
-                    {isTrashView && (
-                      <>
-                        <span>•</span>
-                        <span className="text-red-500 text-xs font-medium flex items-center">
-                          <FiClock className="mr-1" size={12} />
-                          {calculateRemainingDays(file.deleted_at)} days left
-                        </span>
-                      </>
-                    )}
-                    {isArchiveView && (
-                      <>
-                        <span>•</span>
-                        <span className="text-amber-600 text-xs font-medium">
-                          Obsolete / Archived
-                        </span>
-                      </>
-                    )}
-                    {!canView && (
-                      <span className="text-red-500 text-xs font-medium">
-                        No view permission
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  {/* Rename */}
-                  {!isTrashView && !isArchiveView && (userRole === "super_admin" || file.created_by === userId) && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRename(file.id, file.name);
-                      }}
-                      className="p-2 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-colors"
-                      title="Rename File"
-                    >
-                      <FiEdit3 size={18} />
-                    </button>
-                  )}
-
-                  {/* Move */}
-                  {canView && !isTrashView && !isArchiveView && userRole === "super_admin" && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMoveClick(file.id, file.name);
-                      }}
-                      className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
-                      title="Move File"
-                    >
-                      <FiMove size={18} />
-                    </button>
-                  )}
-
-                  {/* Open — allowed in archive (OBSOLETE stamp applied server-side for PDFs) */}
-                  {canView && !isTrashView && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenFile(file);
-                      }}
-                      className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-                      title={isArchiveView ? "Open (OBSOLETE)" : "Open in new window"}
-                    >
-                      <FiExternalLink size={18} />
-                    </button>
-                  )}
-
-                  {/* Download */}
-                  {canDownload && !isTrashView && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        requestDownload(file);
-                      }}
-                      className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors"
-                      title="Download"
-                    >
-                      <FiDownload size={18} />
-                    </button>
-                  )}
-
-                  {userRole === "super_admin" &&
-                    !isTrashView &&
-                    !isArchiveView &&
-                    !file.folder_id && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAssignPermission(file.id, "file");
-                        }}
-                        className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-colors"
-                        title="Set Permissions"
-                      >
-                        <FiKey size={18} />
-                      </button>
-                    )}
-
-                  {/* Archive (move out of active docs) */}
-                  {!isTrashView && !isArchiveView && userRole === "super_admin" && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleArchive(file.id, file.name);
-                      }}
-                      className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-colors"
-                      title="Move to Archive"
-                    >
-                      <FiArchive size={18} />
-                    </button>
-                  )}
-
-                  {/* Archive view actions */}
-                  {isArchiveView && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUnarchive(file.id, file.name);
-                      }}
-                      className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors"
-                      title="Restore from Archive"
-                    >
-                      <FiRotateCcw size={18} />
-                    </button>
-                  )}
-
-                  {/* Trash view actions */}
+                <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
+                  <span>{formatFileSize(file.size || 0)}</span>
+                  <span>•</span>
+                  <span
+                    onClick={(e) => handleUploadDateClick(file, e)}
+                    className={
+                      userRole === "super_admin" && !isTrashView
+                        ? "select-none"
+                        : undefined
+                    }
+                  >
+                    {new Date(file.created_at).toLocaleDateString()}
+                  </span>
                   {isTrashView && (
                     <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRestore(file.id, file.name);
-                        }}
-                        className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors"
-                        title="Restore"
-                      >
-                        <FiRotateCcw size={18} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePermanentDelete(file.id, file.name);
-                        }}
-                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                        title="Delete Forever"
-                      >
-                        <FiTrash2 size={18} />
-                      </button>
+                      <span>•</span>
+                      <span className="text-red-500 text-xs font-medium flex items-center">
+                        <FiClock className="mr-1" size={12} />
+                        {calculateRemainingDays(file.deleted_at)} days left
+                      </span>
                     </>
                   )}
-
-                  {/* Regular view — soft delete to trash */}
-                  {!isTrashView && !isArchiveView && userRole === "super_admin" && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(file.id, file.name);
-                      }}
-                      className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                      title="Delete"
-                    >
-                      <FiTrash2 size={18} />
-                    </button>
+                  {isArchiveView && (
+                    <>
+                      <span>•</span>
+                      <span className="text-amber-600 text-xs font-medium">
+                        Obsolete / Archived
+                      </span>
+                    </>
+                  )}
+                  {!canView && (
+                    <span className="text-red-500 text-xs font-medium">
+                      No view permission
+                    </span>
                   )}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+
+              {renderActions(file)}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {body}
       {/* Move File Modal */}
       <MoveFileModal
         isOpen={moveModalOpen}

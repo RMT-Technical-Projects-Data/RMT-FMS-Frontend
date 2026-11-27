@@ -49,6 +49,22 @@ export interface DownloadAuditLog {
   ip_address?: string | null;
 }
 
+export interface ActivityAuditLog {
+  id: number;
+  user_id: number | null;
+  username: string;
+  action: string;
+  resource_type: string | null;
+  resource_id: number | null;
+  resource_name: string | null;
+  details: string | null;
+  ip_address: string | null;
+  status: string;
+  created_at: string;
+}
+
+export type ViewMode = "grid" | "list" | "compact";
+
 export interface Permission {
   id: number;
   user_id: number;

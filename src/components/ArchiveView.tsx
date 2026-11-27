@@ -27,16 +27,12 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
     isLoading: filesLoading,
     isError: filesError,
   } = useArchivedFiles(selectedFolderId);
-  const {
-    data: archivedFolders,
-    isError: foldersError,
-  } = useArchivedFolders(selectedFolderId);
+  const { data: archivedFolders, isError: foldersError } =
+    useArchivedFolders(selectedFolderId);
 
-  // Don't block forever if folders endpoint fails — still show archived files
   const isLoading = filesLoading && !archivedFiles;
   const folders = foldersError ? [] : archivedFolders || [];
   const files = filesError ? [] : archivedFiles || [];
-  const totalItems = folders.length + files.length;
   const showFatalError = filesError && !archivedFiles;
 
   const handleBackClick = () => {
@@ -49,100 +45,91 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
           {selectedFolderId && (
             <button
+              type="button"
               onClick={handleBackClick}
-              className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              className="h-9 px-3 rounded-md border border-rule bg-white text-[13px] font-medium text-ink inline-flex items-center gap-1.5 hover:border-brand-dark"
             >
-              <FiArrowLeft size={18} />
-              <span>Back</span>
+              <FiArrowLeft size={14} />
+              Back
             </button>
           )}
-          <div className="p-3 rounded-xl bg-amber-50 text-amber-700">
-            <FiArchive size={22} />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Archive</h2>
-            <p className="text-sm text-gray-500">
-              Archived files keep their folder path. Only the archived file is
-              moved — other files stay active.
-            </p>
-            <p className="text-xs text-gray-400 mt-1">{totalItems} items</p>
-          </div>
+          <p className="text-sm text-muted">
+            Archived files keep their folder path.
+          </p>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">
+        <div className="bg-white border border-rule rounded-lg py-16 text-center text-sm text-muted">
           Loading archived documents…
         </div>
       ) : showFatalError ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-red-500">
+        <div className="bg-white border border-rule rounded-lg py-16 text-center text-sm text-[#b42318]">
           Failed to load archived documents.
         </div>
-      ) : totalItems === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-24 h-24 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <FiArchive className="text-amber-400" size={32} />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            No archived documents
-          </h3>
-          <p className="text-gray-500 max-w-md mx-auto">
-            When you archive a file, its folder structure appears here so you
-            can open the same path.
-          </p>
-        </div>
       ) : (
-        <div className="space-y-6">
-          {folders.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Folders
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {folders.map((folder) => (
-                  <button
-                    key={folder.id}
-                    type="button"
-                    onClick={() => handleFolderClick(folder)}
-                    className="flex items-center p-4 bg-amber-50/60 rounded-xl border border-amber-100 hover:shadow-md transition-all text-left"
-                  >
-                    <div className="p-3 rounded-xl bg-amber-100 text-amber-700 mr-3">
-                      <FiFolder size={22} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-gray-900 truncate">
-                        {folder.name}
-                      </div>
-                      <div className="text-xs text-amber-700 mt-0.5">
-                        Archive path
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+        <>
+          <section className="border border-rule rounded-lg overflow-hidden bg-white">
+            <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3]">
+              <h3 className="text-[14px] font-semibold text-ink">Folders</h3>
             </div>
-          )}
+            <div className="p-4">
+              {folders.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                  {folders.map((folder) => (
+                    <div
+                      key={folder.id}
+                      onClick={() => handleFolderClick(folder)}
+                      className="folder-card inline-flex items-center gap-3 w-fit max-w-[260px] px-3.5 py-3 bg-white border border-rule rounded-lg cursor-pointer hover:border-[#b9b19f] hover:shadow-sm transition-all"
+                    >
+                      <span className="h-10 w-10 rounded-lg bg-[#0b1622] text-white flex items-center justify-center shrink-0">
+                        <FiFolder size={18} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[14px] text-ink truncate max-w-[140px]">
+                          {folder.name}
+                        </p>
+                        <p className="text-[12px] text-muted">Archive path</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted py-6 text-center">
+                  No folders here.
+                </p>
+              )}
+            </div>
+          </section>
 
-          {files.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {folders.length > 0 ? "Archived Files" : "Archived Items"}
-              </h3>
-              <FileList
-                files={files}
-                onAssignPermission={onAssignPermission}
-                userRole={user.role}
-                userId={user.id}
-                isArchiveView={true}
-              />
+          <section className="border border-rule rounded-lg overflow-hidden bg-white">
+            <div className="px-4 py-2.5 border-b border-rule bg-[#f8f7f3]">
+              <h3 className="text-[14px] font-semibold text-ink">Files</h3>
             </div>
-          )}
-        </div>
+            <div className="p-4">
+              {files.length > 0 ? (
+                <FileList
+                  files={files}
+                  viewMode="list"
+                  onAssignPermission={onAssignPermission}
+                  userRole={user.role}
+                  userId={user.id}
+                  isArchiveView={true}
+                />
+              ) : (
+                <div className="py-10 text-center">
+                  <FiArchive className="mx-auto text-muted mb-2" size={22} />
+                  <p className="text-sm text-muted">No archived files here.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </>
       )}
     </div>
   );

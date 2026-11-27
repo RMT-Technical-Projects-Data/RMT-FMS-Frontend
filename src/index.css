@@ -1,1 +1,94 @@
 @import "tailwindcss";
+
+/*
+ * Layout tokens aligned with DL panel/table UI.
+ * Fonts are intentionally left alone — EDMS keeps its existing typeface.
+ */
+@theme {
+  --color-ink: #13212e;
+  --color-ink-soft: #22384b;
+  --color-paper: #f6f5f1;
+  --color-rule: #ddd8cc;
+  --color-muted: #5d6b78;
+  --color-brand: #2b7ec2;
+  --color-brand-dark: #1f639c;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* Pager: sticky under the scrollable table panel */
+.edms-pager {
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-rule);
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: #fff;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 -6px 12px -10px rgba(19, 33, 46, 0.25);
+}
+
+.edms-pager:only-child {
+  border-top: 0;
+}
+
+.edms-scroll {
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+}
+
+.edms-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f3f1ea;
+}
+
+.edms-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: auto;
+}
+
+.edms-table th,
+.edms-table td {
+  white-space: nowrap;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid #eeeae1;
+  font-size: 13.5px;
+  vertical-align: middle;
+}
+
+.edms-table th {
+  color: var(--color-muted);
+  font-weight: 600;
+  font-size: 12.5px;
+  background: #f3f1ea;
+}
+
+.edms-table tbody tr:hover td {
+  background: #f8f7f3;
+}
+
+.edms-table td.wrap,
+.edms-table th.wrap {
+  white-space: normal;
+}

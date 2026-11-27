@@ -7,19 +7,14 @@ import {
   FiMenu,
   FiArchive,
   FiActivity,
-  FiSearch,
-  FiX,
-  // FiStar,
   FiTrash2,
 } from "react-icons/fi";
-import ReviveMedicalTechLogo from "/ReviveMediTech.jpg";
+import ReviveMedicalTechLogo from "/ReviveMedicalTech.png";
 import FileManagement from "../components/FileManagement";
 import UserManagementView from "../components/UserManagementView";
-// import FavoritesView from "../components/FavoritesView";
-// import FavoritesNavigationView from "../components/FavoritesNavigationView";
 import TrashView from "../components/TrashView";
 import ArchiveView from "../components/ArchiveView";
-import DownloadAuditView from "../components/DownloadAuditView";
+import AuditLogsView from "../components/AuditLogsView";
 import type { User } from "../types";
 
 const Dashboard: React.FC = () => {
@@ -27,10 +22,7 @@ const Dashboard: React.FC = () => {
   const [selectedFolderName, setSelectedFolderName] = useState<string | null>(
     null
   );
-
-  // navigationHistory stores folder IDs (as before)
   const [navigationHistory, setNavigationHistory] = useState<number[]>([]);
-  // navigationNameHistory stores folder names in parallel (new)
   const [navigationNameHistory, setNavigationNameHistory] = useState<
     (string | null)[]
   >([]);
@@ -38,7 +30,13 @@ const Dashboard: React.FC = () => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("edms_sidebar_collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isGlobalSearch, setIsGlobalSearch] = useState(false);
@@ -49,107 +47,66 @@ const Dashboard: React.FC = () => {
   } | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  // const { data: folders, isLoading: foldersLoading } = useFolderTree();
   const navigate = useNavigate();
-
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // --- NEW: add titles (tooltips) for truncated file names inside FileManagement ---
-  // Improved: set the `title` also on the nearest clickable / container ancestor
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "edms_sidebar_collapsed",
+        sidebarCollapsed ? "1" : "0"
+      );
+    } catch {
+      /* optional */
+    }
+  }, [sidebarCollapsed]);
+
   useEffect(() => {
     const container = document.getElementById("file-management-wrapper");
     if (!container) return;
 
     const setTitles = () => {
-      // candidates inside FileManagement that usually hold file/folder names
       const selectors =
         ".truncate, .file-name, [data-filename], .text-ellipsis, .overflow-ellipsis";
       const candidates = container.querySelectorAll<HTMLElement>(selectors);
-
       candidates.forEach((el) => {
         const text = el.innerText?.trim();
         if (!text) return;
-
-        // set title on the text element itself if missing
-        if (!el.getAttribute("title")) {
-          el.setAttribute("title", text);
-        }
-
-        // Also set the title on a reasonable enclosing clickable/container element
-        // so hovering the icon or surrounding area shows the same tooltip.
-        // Check common clickable/container selectors and some file/folder class names
-        const clickableSelectors =
-          'button, a, [role="button"], .file-item, .folder-item, .file-row, .folder-row, .project-folder, .folder-card, .file-card';
-        let clickable: Element | null = null;
-        try {
-          clickable = el.closest(clickableSelectors);
-        } catch {
-          // In case closest throws for some exotic selector, we'll fallback below
-          clickable = null;
-        }
-
-        // If we found a clickable ancestor, set its title if not already set
-        if (clickable && clickable instanceof HTMLElement && !clickable.getAttribute("title")) {
+        if (!el.getAttribute("title")) el.setAttribute("title", text);
+        const clickable = el.closest(
+          'button, a, [role="button"], .file-item, .folder-item, .file-row, .folder-row, .folder-card, .file-card'
+        );
+        if (clickable instanceof HTMLElement && !clickable.getAttribute("title")) {
           clickable.setAttribute("title", text);
-        } else {
-          // Fallbacks:
-          // 1) parent element (covers icon next to name in the same wrapper)
-          const parent = el.parentElement;
-          if (parent && !parent.getAttribute("title")) {
-            parent.setAttribute("title", text);
-          }
-          // 2) grandparent as a last resort
-          else if (parent?.parentElement && !parent.parentElement.getAttribute("title")) {
-            parent.parentElement.setAttribute("title", text);
-          }
         }
-
-        // Also ensure any sibling icons (e.g., svg inside the same wrapper) inherit the title via wrapper,
-        // so hovering over icon will show the tooltip as well.
       });
     };
 
-    // initial pass
     setTitles();
-
-    // observe DOM changes so dynamically-added rows also get titles
-    const mo = new MutationObserver(() => {
-      setTitles();
+    const mo = new MutationObserver(setTitles);
+    mo.observe(container, {
+      childList: true,
+      subtree: true,
+      characterData: true,
     });
-    mo.observe(container, { childList: true, subtree: true, characterData: true });
-
     return () => mo.disconnect();
-  }, [
-    activeView,
-    isUploadModalOpen,
-    isPermissionModalOpen,
-    isUserManagementOpen,
-    selectedFolderId,
-    selectedFolderName,
-  ]);
-  // --- end new code ---
-
-  // const handleEditUser = (userItem: User) => {
-  //   setEditingUser(userItem);
-  //   setIsUserManagementOpen(true);
-  // };
+  }, [activeView, selectedFolderId, selectedFolderName]);
 
   const handleUserManagementClose = () => {
     setIsUserManagementOpen(false);
     setEditingUser(null);
   };
 
-  // Navigation functions with history
-  // NOTE: onFolderSelect can be called with (folderId) or (folderId, folderName)
-  const handleFolderSelect = (folderId: number | null, folderName?: string | null) => {
+  const handleFolderSelect = (
+    folderId: number | null,
+    folderName?: string | null
+  ) => {
     if (folderId === null) {
-      // Going back to root - clear history and name
       setSelectedFolderId(null);
       setSelectedFolderName(null);
       setNavigationHistory([]);
       setNavigationNameHistory([]);
     } else {
-      // Going into a folder - add current folder id & name to history (if currently inside a folder)
       if (selectedFolderId !== null) {
         setNavigationHistory((prev) => [...prev, selectedFolderId]);
         setNavigationNameHistory((prev) => [...prev, selectedFolderName]);
@@ -161,25 +118,39 @@ const Dashboard: React.FC = () => {
 
   const handleBackNavigation = () => {
     if (navigationHistory.length > 0) {
-      // Go back to previous folder in history
       const previousFolderId = navigationHistory[navigationHistory.length - 1];
       const previousFolderName =
         navigationNameHistory[navigationNameHistory.length - 1] ?? null;
-
       setNavigationHistory((prev) => prev.slice(0, -1));
       setNavigationNameHistory((prev) => prev.slice(0, -1));
-
       setSelectedFolderId(previousFolderId);
       setSelectedFolderName(previousFolderName);
     } else {
-      // No history - go to root
       setSelectedFolderId(null);
       setSelectedFolderName(null);
     }
   };
 
-  const handleUserCreated = () => {
-    setEditingUser(null);
+  const handleBreadcrumbJump = (index: number) => {
+    // index 0 = Dashboard root
+    if (index <= 0) {
+      handleFolderSelect(null);
+      return;
+    }
+    const historyNames = navigationNameHistory.filter(
+      (name): name is string => !!name && name.trim().length > 0
+    );
+    const targetHistoryIdx = index - 1;
+    if (targetHistoryIdx < historyNames.length) {
+      const newHistIds = navigationHistory.slice(0, targetHistoryIdx);
+      const newHistNames = navigationNameHistory.slice(0, targetHistoryIdx);
+      const targetId = navigationHistory[targetHistoryIdx];
+      const targetName = navigationNameHistory[targetHistoryIdx];
+      setNavigationHistory(newHistIds);
+      setNavigationNameHistory(newHistNames);
+      setSelectedFolderId(targetId);
+      setSelectedFolderName(targetName);
+    }
   };
 
   const handleLogout = () => {
@@ -189,369 +160,337 @@ const Dashboard: React.FC = () => {
   };
 
   const selectedFolderPathSegments = useMemo(() => {
-    if (!selectedFolderId) {
-      return [];
-    }
-
+    if (!selectedFolderId) return [];
     const historyNames = navigationNameHistory.filter(
       (name): name is string => !!name && name.trim().length > 0
     );
-
     const segments = ["Dashboard", ...historyNames];
-
     if (selectedFolderName && selectedFolderName.trim().length > 0) {
       segments.push(selectedFolderName);
     }
-
     return segments;
   }, [navigationNameHistory, selectedFolderId, selectedFolderName]);
 
   const navigationItems = [
-    {
-      id: "dashboard",
-      name: "Dashboard",
-      icon: FiHome,
-      color: "text-blue-600",
-    },
-    // {
-    //   id: "favorites",
-    //   name: "Favorites",
-    //   icon: FiStar,
-    //   color: "text-yellow-600",
-    // },
+    { id: "dashboard", name: "Dashboard", icon: FiHome, group: "Workspace" },
+    { id: "archive", name: "Archive", icon: FiArchive, group: "Workspace" },
   ];
 
-  // Archive is available to all authenticated users (scoped server-side)
-  navigationItems.push({
-    id: "archive",
-    name: "Archive",
-    icon: FiArchive,
-    color: "text-amber-600",
-  });
-
-  // Trash, Audit Logs, and Users — Super Admin only
   if (user.role === "super_admin") {
-    navigationItems.push({
-      id: "audit",
-      name: "Download Logs",
-      icon: FiActivity,
-      color: "text-teal-600",
-    });
-    navigationItems.push({
-      id: "trash",
-      name: "Trash",
-      icon: FiTrash2,
-      color: "text-red-600",
-    });
-    navigationItems.push({
-      id: "users",
-      name: "Users",
-      icon: FiUsers,
-      color: "text-indigo-600",
-    });
+    navigationItems.push(
+      { id: "audit", name: "Audit Logs", icon: FiActivity, group: "Admin" },
+      { id: "trash", name: "Trash", icon: FiTrash2, group: "Admin" },
+      { id: "users", name: "Users", icon: FiUsers, group: "Admin" }
+    );
   }
 
-  // Add Logout to navigation items
-  navigationItems.push({
-    id: "logout",
-    name: "Logout",
-    icon: FiLogOut,
-    color: "text-red-600",
-  });
-
   const handleNavigationClick = (itemId: string) => {
-    if (itemId === "logout") {
-      handleLogout();
-    } else {
-      setActiveView(itemId);
-      // Reset selected folder when switching views
-      setSelectedFolderId(null);
-      setSelectedFolderName(null);
-      setNavigationHistory([]);
-      setNavigationNameHistory([]);
-      if (itemId !== "dashboard") {
-        setSearchQuery("");
-        setIsGlobalSearch(false);
-      }
+    setActiveView(itemId);
+    setSelectedFolderId(null);
+    setSelectedFolderName(null);
+    setNavigationHistory([]);
+    setNavigationNameHistory([]);
+    if (itemId !== "dashboard") {
+      setSearchQuery("");
+      setIsGlobalSearch(false);
     }
   };
 
+  const pageTitle =
+    activeView === "dashboard"
+      ? "Dashboard"
+      : activeView === "archive"
+        ? "Archive"
+        : activeView === "audit"
+          ? "Audit Logs"
+          : activeView === "trash"
+            ? "Trash"
+            : activeView === "users"
+              ? "User Management"
+              : "EDMS";
+
+  const toggleMenu = () => {
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      setSidebarCollapsed((v) => !v);
+    } else {
+      setMobileSidebarOpen((v) => !v);
+    }
+  };
+
+  const narrow = sidebarCollapsed && !mobileSidebarOpen;
+  const rowClass = (active: boolean) =>
+    `flex items-center gap-3 h-10 w-full rounded-md text-[14px] transition-colors ${
+      narrow ? "md:justify-center" : ""
+    } px-3 ${
+      active
+        ? "bg-ink-soft text-white font-medium shadow-[inset_3px_0_0_#5aa6e6]"
+        : "text-[#b8c6d3] hover:bg-[#1b2d3d] hover:text-white"
+    }`;
+
+  const initials = (user.username || "U").charAt(0).toUpperCase();
+
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-blue-50/30">
-      {/* Sidebar */}
-      <div
-        className={`fixed inset-y-0 left-0 bg-white/95 backdrop-blur-xl shadow-2xl transform transition-all duration-300 ease-in-out lg:static ${
-          sidebarOpen
-            ? "translate-x-0 w-80 lg:block"
-            : "-translate-x-full lg:hidden"
-        } ${
-          mobileSidebarOpen ? "translate-x-0 w-80" : "-translate-x-full"
-        } border-r border-gray-200/60`}
+    <div className="min-h-screen bg-paper text-ink">
+      {mobileSidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setMobileSidebarOpen(false)}
+          className="md:hidden fixed inset-0 z-30 bg-ink/50"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-52 bg-[#0b1622] text-white flex flex-col transition-[width,transform] duration-200 ${
+          sidebarCollapsed ? "md:w-[72px]" : "md:w-52"
+        } ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200/60">
-            <div className="flex items-center space-x-3">
-              <img
-                src={ReviveMedicalTechLogo}
-                alt="Revive Medical Tech"
-                className="h-12 md:h-16 lg:h-20 xl:h-24 2xl:h-20 w-auto transition-all duration-300"
-              />
-            </div>
-            <button
-  onClick={() => setSidebarOpen(!sidebarOpen)}
-  className="hidden lg:flex p-2 hover:bg-gray-100 rounded-xl transition-colors"
->
-  <FiMenu size={18} className="text-gray-500" />
-</button>
-
-<button
-  onClick={() => setMobileSidebarOpen(false)}
-  className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
->
-  <FiMenu size={18} className="text-gray-500" />
-</button>
-          </div>
-
-          {/* Navigation */}
-          <div className="flex-1 px-3">
-            <nav className="space-y-1">
-              {navigationItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavigationClick(item.id)}
-                    className={`flex items-center w-full px-4 py-3 rounded-xl transition-all ${
-                      activeView === item.id && item.id !== "logout"
-                        ? "bg-blue-50 text-blue-700 border border-blue-200"
-                        : item.id === "logout"
-                        ? "text-red-600 hover:bg-red-50"
-                        : "text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    <Icon
-                      size={20}
-                      className={`mr-3 ${
-                        activeView === item.id && item.id !== "logout"
-                          ? "text-blue-600"
-                          : item.color
-                      }`}
-                    />
-                    <span className="font-medium">{item.name}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* User Section */}
-          <div className="p-6 border-t border-gray-200/60">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-semibold text-sm">
-                  {user.username ? user.username.charAt(0).toUpperCase() : "U"}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
-                  {user.username}
-                </p>
-                <p className="text-xs text-gray-500 capitalize">{user.role}</p>
-               
-              </div>
-            </div>
+        <div
+          className={`border-b border-[#243445] ${
+            narrow ? "md:px-2 md:py-2 md:flex md:justify-center" : "pl-0 pr-2 py-1.5"
+          }`}
+        >
+          <div
+            className={`overflow-hidden ${
+              narrow ? "md:w-12 md:h-12 w-full" : "w-full"
+            }`}
+          >
+            <img
+              src={ReviveMedicalTechLogo}
+              alt="Revive Medical Technologies"
+              className={`block w-full object-contain object-left mix-blend-lighten ${
+                narrow
+                  ? "md:h-12 md:object-center md:scale-150 h-auto"
+                  : "h-auto max-w-none w-[118%] -ml-2 scale-[1.05] origin-left"
+              }`}
+            />
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:ml-0 min-w-0">
-        {/* Header */}
-        <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/60">
-          <div className="flex items-center justify-between p-6">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setMobileSidebarOpen(true)}
-                className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
-              >
-                <FiMenu size={24} className="text-gray-600" />
-              </button>
-              {!sidebarOpen && (
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="hidden lg:flex p-2 hover:bg-gray-100 rounded-xl transition-colors"
-                >
-                  <FiMenu size={24} className="text-gray-600" />
-                </button>
-              )}
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {activeView === "dashboard" && "Dashboard"}
-                  {/* {activeView === "favorites" && "Favorites"} */}
-                  {activeView === "archive" && "Archive"}
-                  {activeView === "audit" && "Download Activity"}
-                  {activeView === "trash" && "Trash"}
-                  {activeView === "users" && "User Management"}
-                </h1>
-                <p className="text-gray-500">
-                  {selectedFolderId
-                    ? selectedFolderName
-                      ? `Folder: ${selectedFolderName}`
-                      : `Folder: ${selectedFolderId}`
-                    : "All your files in one place"}
-                </p>
-              </div>
-            </div>
-
-            {activeView === "dashboard" && (
-              <div className="flex items-center gap-2 flex-1 max-w-xl ml-4">
-                <div className="relative flex-1 min-w-0">
-                  <FiSearch
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                    size={16}
-                  />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={
-                      isGlobalSearch
-                        ? "Search all files and folders..."
-                        : "Filter items on this screen..."
-                    }
-                    className="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded-md"
-                      title="Clear search"
-                      aria-label="Clear search"
+        <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-4">
+          {navigationItems.map((item, i) => {
+            const Icon = item.icon;
+            const active = activeView === item.id;
+            const newGroup =
+              item.group && item.group !== navigationItems[i - 1]?.group;
+            return (
+              <React.Fragment key={item.id}>
+                {newGroup &&
+                  (narrow ? (
+                    <div className="mx-3 my-3 border-t border-[#243445]" />
+                  ) : (
+                    <p className="px-3 pt-5 pb-2 eyebrow text-[#8aa2b8]">
+                      {item.group}
+                    </p>
+                  ))}
+                <div className="mb-0.5">
+                  <button
+                    type="button"
+                    title={narrow ? item.name : undefined}
+                    onClick={() => {
+                      handleNavigationClick(item.id);
+                      setMobileSidebarOpen(false);
+                    }}
+                    className={rowClass(active)}
+                  >
+                    <Icon size={15} className="shrink-0" aria-hidden="true" />
+                    <span
+                      className={`truncate flex-1 text-left ${
+                        narrow ? "md:sr-only" : ""
+                      }`}
                     >
-                      <FiX size={14} />
-                    </button>
-                  )}
+                      {item.name}
+                    </span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsGlobalSearch((v) => !v)}
-                  className={`shrink-0 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                    isGlobalSearch
-                      ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                  }`}
-                  title={
-                    isGlobalSearch
-                      ? "Global search is on — searching everywhere"
-                      : "Turn on to search across all files and folders"
-                  }
-                >
-                  Global Search
-                </button>
-              </div>
-            )}
+              </React.Fragment>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-[#243445] px-3 py-3 space-y-0.5">
+          <div
+            className={`flex items-center gap-3 px-3 py-2 ${
+              narrow ? "md:justify-center" : ""
+            }`}
+          >
+            <span className="h-8 w-8 rounded-full bg-white/10 text-white text-xs font-semibold flex items-center justify-center shrink-0">
+              {initials}
+            </span>
+            <span className={`min-w-0 ${narrow ? "md:hidden" : ""}`}>
+              <span className="block text-sm font-medium truncate">
+                {user.username}
+              </span>
+              <span className="block text-xs text-[#8aa2b8] capitalize truncate">
+                {user.role?.replace(/_/g, " ")}
+              </span>
+            </span>
           </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={`${rowClass(false)} hover:!text-[#ff9a94]`}
+            title={narrow ? "Log out" : undefined}
+          >
+            <FiLogOut size={15} className="shrink-0" />
+            <span
+              className={`truncate flex-1 text-left ${
+                narrow ? "md:sr-only" : ""
+              }`}
+            >
+              Log out
+            </span>
+          </button>
+        </div>
+      </aside>
+
+      <div
+        className={`min-w-0 flex flex-col min-h-screen transition-[margin] duration-200 ${
+          sidebarCollapsed ? "md:ml-[72px]" : "md:ml-52"
+        }`}
+      >
+        <header className="sticky top-0 z-20 h-16 bg-paper/95 backdrop-blur border-b border-rule px-4 md:px-6 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleMenu}
+            aria-label="Toggle menu"
+            className="h-10 w-10 -ml-1 shrink-0 rounded-md flex items-center justify-center text-muted hover:text-ink hover:bg-[#ebe8df]"
+          >
+            <FiMenu size={18} />
+          </button>
+
+          <nav aria-label="Breadcrumb" className="flex-1 min-w-0">
+            <ol className="flex items-center gap-2 min-w-0">
+              {activeView === "dashboard" &&
+              selectedFolderPathSegments.length > 0 ? (
+                selectedFolderPathSegments.map((segment, index) => {
+                  const last = index === selectedFolderPathSegments.length - 1;
+                  return (
+                    <React.Fragment key={`${segment}-${index}`}>
+                      {index > 0 && (
+                        <li
+                          aria-hidden="true"
+                          className="hidden sm:block text-[#b5ad9c]"
+                        >
+                          /
+                        </li>
+                      )}
+                      <li
+                        className={`truncate ${last ? "" : "hidden sm:block"}`}
+                      >
+                        {last ? (
+                          <h1
+                            className="text-[17px] font-semibold tracking-tight truncate"
+                            aria-current="page"
+                            title={segment}
+                          >
+                            {segment}
+                          </h1>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleBreadcrumbJump(index)}
+                            className="text-sm text-muted hover:text-ink truncate max-w-[160px]"
+                            title={segment}
+                          >
+                            {segment}
+                          </button>
+                        )}
+                      </li>
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                <li>
+                  <h1
+                    className="text-[17px] font-semibold tracking-tight truncate"
+                    aria-current="page"
+                  >
+                    {pageTitle}
+                  </h1>
+                </li>
+              )}
+            </ol>
+          </nav>
+
+          <button
+            type="button"
+            className="flex items-center gap-2.5 h-10 pl-1 pr-2 rounded-md hover:bg-[#ebe8df]"
+            aria-label={`Account: ${user.username}`}
+            title={user.username}
+          >
+            <span
+              aria-hidden="true"
+              className="h-8 w-8 rounded-full bg-ink text-white text-xs font-semibold flex items-center justify-center"
+            >
+              {initials}
+            </span>
+            <span className="hidden sm:block text-left leading-tight">
+              <span className="block text-sm font-medium">{user.username}</span>
+              <span className="block text-xs text-muted capitalize max-w-[180px] truncate">
+                {user.role?.replace(/_/g, " ")}
+              </span>
+            </span>
+          </button>
         </header>
 
-        {/* Content Area */}
-        <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-6">
-            {activeView === "users" ? (
-              <UserManagementView
-                user={user}
-                isUserManagementOpen={isUserManagementOpen}
-                setIsUserManagementOpen={setIsUserManagementOpen}
-                editingUser={editingUser}
-                setEditingUser={setEditingUser}
-                onUserCreated={handleUserCreated}
-                onUserManagementClose={handleUserManagementClose}
-              />
-            ) : activeView === "audit" ? (
-              <DownloadAuditView user={user} />
-            ) : activeView === "archive" ? (
-              <ArchiveView
-                user={user}
+        <main className="flex-1 min-w-0 px-4 md:px-6 py-5">
+          {activeView === "users" ? (
+            <UserManagementView
+              user={user}
+              isUserManagementOpen={isUserManagementOpen}
+              setIsUserManagementOpen={setIsUserManagementOpen}
+              editingUser={editingUser}
+              setEditingUser={setEditingUser}
+              onUserCreated={() => setEditingUser(null)}
+              onUserManagementClose={handleUserManagementClose}
+            />
+          ) : activeView === "audit" ? (
+            <AuditLogsView user={user} />
+          ) : activeView === "archive" ? (
+            <ArchiveView
+              user={user}
+              selectedFolderId={selectedFolderId}
+              onFolderSelect={handleFolderSelect}
+              onBackNavigation={handleBackNavigation}
+              onAssignPermission={(resourceId, resourceType) => {
+                setPermissionResource({ id: resourceId, type: resourceType });
+                setIsPermissionModalOpen(true);
+              }}
+            />
+          ) : activeView === "trash" ? (
+            <TrashView
+              user={user}
+              selectedFolderId={selectedFolderId}
+              onFolderSelect={handleFolderSelect}
+              onBackNavigation={handleBackNavigation}
+              onAssignPermission={(resourceId, resourceType) => {
+                setPermissionResource({ id: resourceId, type: resourceType });
+                setIsPermissionModalOpen(true);
+              }}
+            />
+          ) : (
+            <div id="file-management-wrapper">
+              <FileManagement
                 selectedFolderId={selectedFolderId}
-                onFolderSelect={handleFolderSelect}
-                onBackNavigation={handleBackNavigation}
-                onAssignPermission={(resourceId, resourceType) => {
-                  setPermissionResource({ id: resourceId, type: resourceType });
-                  setIsPermissionModalOpen(true);
-                }}
-              />
-            ) : /* activeView === "favorites" ? (
-              selectedFolderId ? (
-                <FavoritesNavigationView
-                  user={user}
-                  selectedFolderId={selectedFolderId}
-                  onFolderSelect={handleFolderSelect}
-                  onBackNavigation={handleBackNavigation}
-                  onAssignPermission={(resourceId, resourceType) => {
-                    setPermissionResource({
-                      id: resourceId,
-                      type: resourceType,
-                    });
-                    setIsPermissionModalOpen(true);
-                  }}
-                />
-              ) : (
-                <FavoritesView
-                  user={user}
-                  onFolderSelect={handleFolderSelect}
-                  onAssignPermission={(resourceId, resourceType) => {
-                    setPermissionResource({
-                      id: resourceId,
-                      type: resourceType,
-                    });
-                    setIsPermissionModalOpen(true);
-                  }}
-                />
-              )
-            ) : */ activeView === "trash" ? (
-              <TrashView
+                selectedFolderName={selectedFolderName}
+                searchQuery={searchQuery}
+                onSearchQueryChange={setSearchQuery}
+                isGlobalSearch={isGlobalSearch}
+                onGlobalSearchChange={setIsGlobalSearch}
                 user={user}
-                selectedFolderId={selectedFolderId}
+                isUploadModalOpen={isUploadModalOpen}
+                setIsUploadModalOpen={setIsUploadModalOpen}
+                isPermissionModalOpen={isPermissionModalOpen}
+                setIsPermissionModalOpen={setIsPermissionModalOpen}
+                permissionResource={permissionResource}
+                setPermissionResource={setPermissionResource}
                 onFolderSelect={handleFolderSelect}
-                onBackNavigation={handleBackNavigation}
-                onAssignPermission={(resourceId, resourceType) => {
-                  setPermissionResource({ id: resourceId, type: resourceType });
-                  setIsPermissionModalOpen(true);
-                }}
               />
-            ) : (
-              // <-- wrapper added to scope tooltip logic without touching FileManagement internals
-              <div id="file-management-wrapper">
-                <FileManagement
-                  selectedFolderId={selectedFolderId}
-                  selectedFolderName={selectedFolderName}
-                  selectedFolderPathSegments={selectedFolderPathSegments}
-                  searchQuery={searchQuery}
-                  isGlobalSearch={isGlobalSearch}
-                  user={user}
-                  isUploadModalOpen={isUploadModalOpen}
-                  setIsUploadModalOpen={setIsUploadModalOpen}
-                  isPermissionModalOpen={isPermissionModalOpen}
-                  setIsPermissionModalOpen={setIsPermissionModalOpen}
-                  permissionResource={permissionResource}
-                  setPermissionResource={setPermissionResource}
-                  onFolderSelect={handleFolderSelect}
-                  onBackNavigation={handleBackNavigation}
-                />
-              </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </main>
       </div>
-
-      {/* Mobile sidebar overlay */}
-      {mobileSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setMobileSidebarOpen(false)}
-        ></div>
-      )}
     </div>
   );
 };

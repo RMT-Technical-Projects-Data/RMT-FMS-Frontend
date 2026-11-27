@@ -1,15 +1,17 @@
-// components/UserManagementView.tsx
-import React, { useState } from "react";
-import {
-  FiUsers,
-  FiUserPlus,
-  FiEdit2,
-  FiTrash2,
-  FiX,
-} from "react-icons/fi";
+import React, { useMemo, useState } from "react";
+import { FiTrash2, FiUserPlus, FiX } from "react-icons/fi";
 import UserManagement from "./UserManagement";
 import { useUsers, useDeleteUser } from "../hooks/useAuth";
-import type { User } from "../types";
+import type { User, ViewMode } from "../types";
+import DataTable, { type DataColumn } from "./DataTable";
+import {
+  Card,
+  CompactRow,
+  Count,
+  SearchBox,
+  Toolbar,
+  ViewSwitch,
+} from "./ui";
 
 interface UserManagementViewProps {
   user: User;
@@ -37,11 +39,12 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
   } = useUsers();
   const deleteUser = useDeleteUser();
 
-  // State for delete confirmation modal
   const [userToDelete, setUserToDelete] = useState<{
     id: number;
     username: string;
   } | null>(null);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<ViewMode>("list");
 
   const handleDeleteUser = (userId: number, username: string) => {
     setUserToDelete({ id: userId, username });
@@ -64,122 +67,195 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
   };
 
   const handleUserManagementClose = () => {
-    // Reset editing state when closing modal
     setEditingUser(null);
     onUserManagementClose();
   };
 
   const handleAddUser = () => {
-    // Ensure editingUser is null when adding new user
     setEditingUser(null);
     setIsUserManagementOpen(true);
   };
 
-  return (
-    <>
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 p-6">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">User Management</h2>
-            <p className="text-gray-500 mt-1">
-              Manage system users and permissions
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(
+      (u) =>
+        u.username?.toLowerCase().includes(q) ||
+        u.role?.toLowerCase().includes(q)
+    );
+  }, [users, search]);
 
+  const roleTag = (role: string) => (
+    <span
+      className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ${
+        role === "super_admin"
+          ? "bg-[#f8e8f1] text-[#a3306f] border-[#e8c0d6]"
+          : "bg-[#f3f1ea] text-ink border-rule"
+      }`}
+    >
+      {role?.replace(/_/g, " ")}
+    </span>
+  );
+
+  const columns: DataColumn<User>[] = [
+    {
+      key: "username",
+      title: "Name",
+      dataIndex: "username",
+      render: (r) => (
+        <span className="font-medium">
+          {r.username}
+          {r.id === user.id && (
+            <span className="ml-2 text-xs text-brand-dark bg-[#eaf2fb] px-1.5 py-0.5 rounded">
+              You
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "role",
+      title: "Role",
+      dataIndex: "role",
+      render: (r) => roleTag(r.role),
+    },
+    {
+      key: "actions",
+      title: "Actions",
+      sortable: false,
+      align: "right",
+      render: (r) => (
+        <div className="inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => handleEditUser(r)}
+            className="h-8 px-2.5 rounded-md border border-rule text-[13px] text-ink hover:border-brand-dark"
+          >
+            Edit
+          </button>
+          {r.id !== user.id && (
             <button
-              onClick={handleAddUser}
-              className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all transform hover:scale-105"
+              type="button"
+              onClick={() => handleDeleteUser(r.id, r.username)}
+              disabled={deleteUser.isPending}
+              className="h-8 px-2.5 rounded-md border border-rule text-[13px] text-[#b42318] hover:bg-[#fdecea]"
             >
-              <FiUserPlus size={18} />
-              <span>Add User</span>
+              Delete
             </button>
-          </div>
+          )}
         </div>
+      ),
+    },
+  ];
 
-        {/* Users List */}
-        {usersLoading ? (
-          <div className="flex justify-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {users.length === 0 ? (
-              <div className="text-center py-12">
-                <FiUsers className="mx-auto text-gray-400 mb-4" size={48} />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  No Users Found
-                </h3>
-                <p className="text-gray-500 mb-6">
-                  Get started by creating your first user
-                </p>
-                <button
-                  onClick={handleAddUser}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all font-medium"
-                >
-                  Add New User
-                </button>
-              </div>
-            ) : (
-              users.map((userItem) => (
-                <div
-                  key={userItem.id}
-                  className="flex items-center justify-between p-6 bg-gray-50 rounded-xl border border-gray-200 hover:shadow-md transition-all"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <span className="text-white font-semibold text-lg">
-                        {userItem.username?.charAt(0).toUpperCase() || "U"}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-lg">
-                        {userItem.username}
-                        {userItem.id === user.id && (
-                          <span className="ml-2 text-sm text-blue-600 bg-blue-100 px-2 py-1 rounded-lg">
-                            You
-                          </span>
-                        )}
-                      </h3>
-                      <p
-                        className={`text-sm capitalize ${userItem.role === "super_admin"
-                          ? "text-purple-600 font-medium"
-                          : "text-gray-500"
-                          }`}
-                      >
-                        {userItem.role}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
+  let body: React.ReactNode;
+  if (usersLoading) {
+    body = (
+      <div className="bg-white border border-rule rounded-lg py-16 text-center text-sm text-muted">
+        Loading users…
+      </div>
+    );
+  } else if (view === "grid" || view === "compact") {
+    body = (
+      <div className="flex flex-col gap-3">
+        {view === "grid" ? (
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+            {filtered.map((r, i) => (
+              <Card
+                key={r.id}
+                index={i + 1}
+                title={r.username}
+                tag={roleTag(r.role)}
+                lines={[["Role", r.role?.replace(/_/g, " ")]]}
+                footer={
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => handleEditUser(userItem)}
-                      className="p-3 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-                      title="Edit User"
+                      type="button"
+                      onClick={() => handleEditUser(r)}
+                      className="text-brand-dark hover:underline"
                     >
-                      <FiEdit2 size={18} />
+                      Edit
                     </button>
-                    {userItem.id !== user.id && (
+                    {r.id !== user.id && (
                       <button
-                        onClick={() =>
-                          handleDeleteUser(userItem.id, userItem.username)
-                        }
-                        className="p-3 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                        title="Delete User"
-                        disabled={deleteUser.isPending}
+                        type="button"
+                        onClick={() => handleDeleteUser(r.id, r.username)}
+                        className="text-[#b42318] hover:underline"
                       >
-                        <FiTrash2 size={18} />
+                        Delete
                       </button>
                     )}
                   </div>
-                </div>
-              ))
-            )}
+                }
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white border border-rule rounded-lg overflow-hidden">
+            <ul className="divide-y divide-[#eeeae1]">
+              {filtered.map((r, i) => (
+                <CompactRow
+                  key={r.id}
+                  index={i + 1}
+                  title={r.username}
+                  tag={roleTag(r.role)}
+                  lines={[["Role", r.role?.replace(/_/g, " ")]]}
+                />
+              ))}
+            </ul>
           </div>
         )}
+        {!filtered.length && (
+          <p className="bg-white border border-rule rounded-lg py-12 text-center text-sm text-muted">
+            No users found.
+          </p>
+        )}
+      </div>
+    );
+  } else {
+    body = (
+      <DataTable
+        rowKey="id"
+        columns={columns}
+        dataSource={filtered}
+        emptyText="No users found. Add a user to get started."
+      />
+    );
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-5 min-w-0">
+        <Toolbar
+          actions={
+            <>
+              <ViewSwitch value={view} onChange={setView} />
+              <button
+                type="button"
+                onClick={handleAddUser}
+                className="h-8 px-3 rounded-md bg-ink text-white text-[13px] font-medium inline-flex items-center gap-1.5 hover:bg-ink-soft"
+              >
+                <FiUserPlus size={14} />
+                Add User
+              </button>
+            </>
+          }
+        >
+          <SearchBox
+            value={search}
+            onChange={setSearch}
+            placeholder="Search users"
+          />
+          <Count
+            shown={filtered.length}
+            total={users.length}
+            noun="users"
+          />
+        </Toolbar>
+        {body}
       </div>
 
-      {/* User Management Modal */}
       <UserManagement
         isOpen={isUserManagementOpen}
         onClose={handleUserManagementClose}
@@ -188,58 +264,55 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
         currentUser={user}
       />
 
-      {/* Delete Confirmation Modal */}
       {userToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
             type="button"
-            className="fixed inset-0 bg-transparent backdrop-blur-md cursor-default"
+            className="fixed inset-0 bg-ink/40"
             aria-label="Close dialog"
             onClick={() => setUserToDelete(null)}
           />
-          <div className="relative my-auto bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md max-h-[min(90vh,640px)] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center">
-                  <FiTrash2 className="text-white" size={20} />
-                </div>
+          <div className="relative bg-white rounded-lg shadow-xl border border-rule w-full max-w-md">
+            <div className="flex items-center justify-between px-5 h-14 border-b border-rule">
+              <div className="flex items-center gap-3">
+                <span className="h-9 w-9 rounded-full bg-[#fdecea] text-[#b42318] flex items-center justify-center">
+                  <FiTrash2 size={16} />
+                </span>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Delete User
-                  </h2>
-                  <p className="text-sm text-gray-500">
+                  <h2 className="text-[15px] font-semibold">Delete User</h2>
+                  <p className="text-xs text-muted">
                     This action cannot be undone
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setUserToDelete(null)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-[#f3f1ea] rounded-md"
               >
-                <FiX size={20} className="text-gray-500" />
+                <FiX size={18} className="text-muted" />
               </button>
             </div>
-
-            <div className="p-6">
-              <p className="text-gray-700 mb-6">
-                Are you sure you want to delete user{" "}
-                <strong>"{userToDelete.username}"</strong>? This will
-                permanently remove the user and all their data.
+            <div className="p-5">
+              <p className="text-sm text-ink mb-5">
+                Delete user <strong>"{userToDelete.username}"</strong>? This
+                permanently removes the account.
               </p>
-
-              <div className="flex justify-end space-x-3">
+              <div className="grid grid-cols-2 gap-3">
                 <button
+                  type="button"
                   onClick={() => setUserToDelete(null)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                  className="h-10 rounded-md border border-rule text-sm font-medium"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={confirmDeleteUser}
                   disabled={deleteUser.isPending}
-                  className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all font-medium"
+                  className="h-10 rounded-md bg-[#b42318] text-white text-sm font-medium disabled:opacity-50"
                 >
-                  {deleteUser.isPending ? "Deleting..." : "Delete User"}
+                  {deleteUser.isPending ? "Deleting…" : "Delete"}
                 </button>
               </div>
             </div>

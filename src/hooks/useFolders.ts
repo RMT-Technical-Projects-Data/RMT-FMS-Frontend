@@ -498,3 +498,48 @@ export const usePermanentDeleteFolder = () => {
     },
   });
 };
+
+const archiveFolder = async (
+  id: number
+): Promise<{
+  message: string;
+  id: number;
+  name: string;
+  archivedFiles: number;
+}> => {
+  const response = await axios.post(
+    `${API_BASE_URL}/folders/${id}/archive`,
+    {},
+    {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    }
+  );
+  return response.data;
+};
+
+export const useArchiveFolder = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: archiveFolder,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFolders"] });
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["rootFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["archivedFiles"] });
+      queryClient.invalidateQueries({ queryKey: ["archivedFolders"] });
+      toast.success(
+        data.archivedFiles
+          ? `Folder archived (${data.archivedFiles} file${data.archivedFiles === 1 ? "" : "s"})`
+          : "Folder archived"
+      );
+    },
+    onError: (error: any) => {
+      toast.error(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to archive folder"
+      );
+    },
+  });
+};
